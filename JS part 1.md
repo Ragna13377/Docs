@@ -33,12 +33,12 @@
 	- [10.2 Set](#102-set) 
 	- [10.3 WeakMap](#103-weakmap) 
 	- [10.4 WeakSet](#104-weakset) 
-* [11. Асинхронность](#11-aсинхронность)  
+* [11. Асинхронность](#11-асинхронность)  
 	- [11.1 Promise](#111-promise) 
-	- [11.2 Async/await](#112-async/await) 
+	- [11.2 Async, await](#112-async-await) 
 	- [11.3 fetch](#113-fetch) 
 	- [11.4 Таймеры](#114-таймеры) 
-	- [11.5 Observer'ы](#115-observer'ы) 
+	- [11.5 Observer'ы](#115-observerы) 
 	- [11.6 queueMicrotask, requestAnimationFrame, requestIdleCallback](#116-queuemicrotask-requestanimationframe-requestidlecallback) 
 * [12. Error Handling](#12-error-handling)  
 * [13. Event Loop](#13-event-loop)  
@@ -1153,7 +1153,8 @@ console.log(parentObject.childObject === childObject); // false
 **Дескриптор доступа** - дескриптор определяющий работу через функции геттера и сеттера  
 Имена геттера/сеттера и используемой переменной **должно отличаться**: propName и name, property и _property
 Для работы с дескрипторами используются методы:  
-**Передаваемый дескриптор может быть только одного типа**  
+>**Передаваемый дескриптор может быть только одного типа**  
+
 * `Object.defineProperty(obj, prop, descriptor)` - определяет новый или изменяет существующий дескриптор свойства объекта (отсутствующие флаги в дескрипторе имеют значение по умолчанию: false)  
 * `Object.defineProperties(obj, props)` - определяет новые или изменяет существующие дескрипторы нескольких свойств объекта  
 ```javascript
@@ -1287,7 +1288,7 @@ function MakeIterator {
 }  
 ```
 
-По умолчанию Iterable интерфейс реализован в: String, Array, Map, Set  
+По умолчанию Iterable интерфейс реализован в: `String, Array, Map, Set`  
 Итератор позволяет применить к итерируемой сущности: деструктуризацию, преобразование `Array.from`, оператор `spread`    
 
 [Вернуться к содержанию](#содержание)
@@ -1523,46 +1524,46 @@ console.log(groupedByAge.get('young') // [ {name: 'Petr', age: 16} ]
 ### 10.2 Set
 
 **Set** - коллекция для хранения **уникальных** значений  
-Так как Set хранит только значения, то методы keys и values выводят одинаковые результаты, а entries дублирует их в массиве ключ-зачение  
+Так как Set хранит только значения, то методы `keys` и `values` выводят одинаковые результаты, а `entries` дублирует их в массиве ключ-зачение  
 Они нужны только для поддержки универсального интерфеска как у Map (поэтому используют `values`, который возвращает итератор всех значений коллекции в порядке добавления)  
 Наиболее частый способ использования: получение уникальных значений массива `[...new Set(arr)]`  
 
 Пример инициализации: `const testSet = new Set([1,1,2,3])`. Конструктор `new Set(arr)` принимает аргументом итерируемый объект  
 `testSet.size` - колчиество элементов в коллекции 
 Методы Set (работают аналогично методам Map): 
-* testSet.add(value) - добавляет элемент(возвращает коллекцию, поэтому можно вызвать по цепочке)  
-* testSet.delete(value) - удаляет элемент, возвращает boolean (true - удален)  
-* testSet.has(value) - проверяет наличие элемента с переданным ключом  
-* testSet.clear() - очищает коллекцию  
-* testSet.forEach(callbackFn(element[,key[,mapCollection]])[, thisArg]) - - стандартный метод forEach для коллекции Set  
-* testSet.values() - возвращает итератор всех значений коллекции (в порядке добавления)  
-* testSet.difference(other) - возвращает разницу между `testSet` и `other`  
+* `testSet.add(value)` - добавляет элемент(возвращает коллекцию, поэтому можно вызвать по цепочке)  
+* `testSet.delete(value)` - удаляет элемент, возвращает boolean (true - удален)  
+* `testSet.has(value)` - проверяет наличие элемента с переданным ключом  
+* `testSet.clear()` - очищает коллекцию  
+* `testSet.forEach(callbackFn(element[,key[,mapCollection]])[, thisArg])` - - стандартный метод forEach для коллекции Set  
+* `testSet.values()` - возвращает итератор всех значений коллекции (в порядке добавления)  
+* `testSet.difference(other)` - возвращает разницу между `testSet` и `other`  
 ```javascript
 const testSet = new Set([1,3,5,7,9])
 const anotherSet = new Set([1,4,9])
 console.log(testSet.difference(anotherSet)) // Set(3) {3,5,7}
 ```
-* testSet.intersection(other) - возвращает пересечение `testSet` с `other`  
+* `testSet.intersection(other)` - возвращает пересечение `testSet` с `other`  
 ```javascript
 const testSet = new Set([1,3,5,7,9])
 const anotherSet = new Set([1,4,9])
 console.log(testSet.intersection(anotherSet)) // Set(2) {1,9}
 ```
-* testSet.symmetricDifference(other) - возвращает симметричную разницу между `testSet` и `other`  
+* `testSet.symmetricDifference(other)` - возвращает симметричную разницу между `testSet` и `other`  
 ```javascript
 const testSet = new Set([1,3,5,7,9])
 const anotherSet = new Set([1,4,9])
 console.log(testSet.symmetricDifference(anotherSet)) // Set(4) {3,5,7,4}
 ```
-* testSet.union(other) - возвращает объединение `testSet` с `other`  
+* `testSet.union(other)` - возвращает объединение `testSet` с `other`  
 ```javascript
 const testSet = new Set([1,3,5,7,9])
 const anotherSet = new Set([1,4,9])
 console.log(testSet.union(anotherSet)) // Set(4) {1,3,5,7,9,4}
 ```
-* testSet.isDisjointFrom(other) - возвращает boolean, проверяя есть ли элементы из `testSet` в `other`  
-* testSet.isSubsetOf(other) - возвращает boolean, проверяя содержатся ли все элементы из `testSet` в `other`  
-* testSet.isSupersetOf(other) - возвращает boolean, проверяя есть ли элементы из `other` в `testSet`
+* `testSet.isDisjointFrom(other)` - возвращает boolean, проверяя есть ли элементы из `testSet` в `other`  
+* `testSet.isSubsetOf(other)` - возвращает boolean, проверяя содержатся ли все элементы из `testSet` в `other`  
+* `testSet.isSupersetOf(other)` - возвращает boolean, проверяя есть ли элементы из `other` в `testSet`
 
 `other` - `Set` или объект похожий на `Set`, т.е. имеющий свойства `size, has, keys` (например `Map`)
 
@@ -1572,7 +1573,7 @@ console.log(testSet.union(anotherSet)) // Set(4) {1,3,5,7,9,4}
 
 **WeakMap** - коллекция для хранения данных в виде пар ключ-значение, позволяющая затирать свои ключи сборщиком мусора  
 Коллекция **НЕ позволяет** итерировать по своим элементам, потому что неизвестно, когда сборщик мусора удалит их.  
-Элемент удаляется, если в коде он нигде не используется:  
+Элемент удаляется, если в коде он нигде не используется (нет сильных ссылок):  
 ```javascript
 let obj = {name: 'Petr'}  
 const testWeakMap = new WeakMap{[obj: 'Data']}  
@@ -1584,10 +1585,10 @@ testWeakMap.has(obj) // false` - элемент был удален сборщи
 Наиболее часто используется для кэширования элементов. Если их удалят, то память в кэше автоматически освободит сборщик мусора  
 
 Доступные методы (работают аналогично Map):  
-* testWeakMap.set(key, value)  
-* testWeakMap.get(key)  
-* testWeakMap.has(key)  
-* testWeakMap.delete(key)  
+* `testWeakMap.set(key, value)`  
+* `testWeakMap.get(key)`  
+* `testWeakMap.has(key)`  
+* `testWeakMap.delete(key)`  
 
 keys, values, entries, forEach, **size**, **clear** - недоступны  
 
@@ -1601,11 +1602,11 @@ keys, values, entries, forEach, **size**, **clear** - недоступны
 В качестве ключе коллекции WeakSet могут быть **ТОЛЬКО элементы с типом Object** (объекты, другие коллекции, массивы, функции)  
 
 Доступные методы (работают аналогично Set):  
-* testWeakSet.add(value)
-* testWeakSet.delete(value)
-* testWeakSet.has(value)
+* `testWeakSet.add(value)`
+* `testWeakSet.delete(value)`
+* `testWeakSet.has(value)`
 
-keys, values, entries, forEach, **size**, **clear** - недоступны  
+`keys, values, entries, forEach, **size**, **clear**` - недоступны  
 
 [Вернуться к содержанию](#содержание)
 
@@ -1634,13 +1635,13 @@ async function* myGenerator() {
 
 [Работа промисов на примере запросов данных](https://www.youtube.com/watch?v=0O-ZVnwbGW4)  
 [Еще раз все про промисы](https://www.youtube.com/watch?v=c_iQPXDZ_l4)  
-Promise - специальный объект для обработки асинхронного кода. Решает задачу выполнения кода в зависимости от результата асинхронной операции    
-Promise может находиться в 3 состояниях: pending(ожидание), fullfilled(выполнено успешно), rejected(выполнено с ошибкой)  
-Асинхронные функции возвращают объект Promise в качестве значения, в котором хранится результат вычисления  
+`Promise` - специальный объект для обработки асинхронного кода. Решает задачу выполнения кода в зависимости от результата асинхронной операции    
+`Promise` может находиться в 3 состояниях: pending(ожидание), `fullfilled` (выполнено успешно), `rejected` (выполнено с ошибкой)  
+Асинхронные функции возвращают объект `Promise` в качестве значения, в котором хранится результат вычисления  
 
 **Использование промиса**  
-Конструктор принимает колбек-функцию executor, которая выполняет асинхронную операцию и переводит промис в fullfilled или rejected  
-В качестве аргументов передаются колбеки resolve, reject для перевода в соответствующие состояния  
+Конструктор принимает колбек-функцию `executor`, которая выполняет асинхронную операцию и переводит промис в `fullfilled` или `rejected`  
+В качестве аргументов передаются колбеки `resolve, reject` для перевода в соответствующие состояния  
 Аргумент переданный в `resolve` будет доступен в `then`, аргумент переданный в `reject` будет доступен в `catch`  
 ```javascript
 const myPromise = new Promise((resolve, reject) => {
@@ -1659,8 +1660,8 @@ myPromise
 	.finally(() => {})
 	.then(() => {})
 ``` 
-При передаче значения в return оно неявно оборачивается в Promise, для дальнейшего использования в цепочке  
-При передаче Promise в return неявная обертка не вызовется  
+При передаче значения в `return` оно неявно оборачивается в `Promise`, для дальнейшего использования в цепочке  
+При передаче `Promise` в `return` неявная обертка не вызовется  
 
 * `.then(onFulfill, onReject)` - обрабатывает разрешенный промис, где   
 	* `onFulfill` - функция-колбек вызванная при переходе промиса в состояние fullfilled
@@ -1694,14 +1695,14 @@ myPromise.then(data => {
 ```  
 
 `Promise.resolve / Promise.reject` - статические методы, которые сразу создают исполненный или отклоненный промис  
-При передаче Promise в Promise.resolve он вернет его без изменений:  
+При передаче `Promise` в `Promise.resolve` он вернет его без изменений:  
 ```javascript
 const promise = Promise.resolve('Petr')
 const resolved = Promise.resolve(promise) 
 console.log(promise === resolved) // true
 resolved.then((value) => { console.log(value) }) // 'Petr'
 ```
-При передаче Promise в Promise.reject он вернет как отдельный Promise, не распаковывая:
+При передаче `Promise` в `Promise.reject` он вернет как отдельный `Promise`, не распаковывая:
 ```javascript
 const promise = Promise.resolve('Petr')
 const resolved = Promise.reject(promise)
@@ -1766,7 +1767,7 @@ const promise = new Promise((res, rej) => {
 
 [Вернуться к содержанию](#содержание)
 
-### 11.2 Async/await  
+### 11.2 Async, await  
 
 Альтернативный упрощенный синтаксис для работы с промисами  
 Функция маркируется асинхронной: `async function fetchData() {}`. Возвращаемое значение автоматически оборачивается в промис  
@@ -1890,26 +1891,26 @@ Observer - механизм для асинхронного отслеживан
 
 Разбор на примере **Intersection Observer**  
 Конструктор: `new IntersectionObserver(callback, options)`, где  
-* callback(entries, observer) - функция выполняемая при пересечении области и элементов  
-	* entries - список объектов IntersectionObserverEntry (для каждого целевого элемента) с информацией о пересечении. 
-	* observer - ссылка на экземпляр наблюдателя. Содержит методы:  
-		* observe(element) - запуск наблюдения за целевым элементом
-		* unobserve(element) - удаление целевого элемента из списка наблюдаемых
-		* disconnect() - остановка наблюдения за всеми целевыми элементами
-		* takeRecords() - возвращает массив объектов IntersectionObserverEntry для всех целевых элементов, которые пересекли область с момента последней проверки
-* options - объект с опциями наблюдателя  
-	* root - область (по умолчанию viewport) для отслеживания пересечения с целевым элементом
-	* rootMargin - отступ от root
-	* threshold - доля пересечения области, при которой срабатывает callback (число или массив)
+* `callback(entries, observer)` - функция выполняемая при пересечении области и элементов  
+	* `entries` - список объектов IntersectionObserverEntry (для каждого целевого элемента) с информацией о пересечении. 
+	* `observer` - ссылка на экземпляр наблюдателя. Содержит методы:  
+		* `observe(element)` - запуск наблюдения за целевым элементом
+		* `unobserve(element)` - удаление целевого элемента из списка наблюдаемых
+		* `disconnect()` - остановка наблюдения за всеми целевыми элементами
+		* `takeRecords()` - возвращает массив объектов IntersectionObserverEntry для всех целевых элементов, которые пересекли область с момента последней проверки
+* `options` - объект с опциями наблюдателя  
+	* `root` - область (по умолчанию viewport) для отслеживания пересечения с целевым элементом
+	* `rootMargin` - отступ от root
+	* `threshold` - доля пересечения области, при которой срабатывает callback (число или массив)
 
 Свойства объекта IntersectionObserverEntry:
-* isIntersecting - boolean, есть ли пересечение элемента с наблюдаемой областью
-* intersectionRatio - доля (от 0 до 1) пересечения целевого элемента с областью. 1 - полностью пересек, 0.5 - наполовину 
-* target - целевой элемент
-* boundingClientRect - `getBoundingClientRect()` для целевого элемента
-* intersectionRect - `getBoundingClientRect()` для область пересечения целевого элемента с областью
-* rootBounds - `getBoundingClientRect()` области смещенной на rootMargin
-* time - DOMHighResTimeStamp с момента создания документа до пересечения целевого элемента с областью
+* `isIntersecting` - boolean, есть ли пересечение элемента с наблюдаемой областью
+* `intersectionRatio` - доля (от 0 до 1) пересечения целевого элемента с областью. 1 - полностью пересек, 0.5 - наполовину 
+* `target` - целевой элемент
+* `boundingClientRect` - `getBoundingClientRect()` для целевого элемента
+* `intersectionRect` - `getBoundingClientRect()` для область пересечения целевого элемента с областью
+* `rootBounds` - `getBoundingClientRect()` области смещенной на rootMargin
+* `time` - DOMHighResTimeStamp с момента создания документа до пересечения целевого элемента с областью
 Используется для lazy загрузки контента, создания "бесконечного скролла" на сайте  
 ```javascript
 const targetElement = document.querySelector('.element')
@@ -2124,11 +2125,9 @@ console.log('Synchronized end');
 Также нужно разбивать тяжелые задачи, чтобы дать браузеру перерендерить страницу (даже если браузер не нуждается в новой отрисовке) - это избавит от дрожания анимации в будущем.  
 [Пример порядка выполнения](https://dev.to/bymarsel/unraveling-macrotasks-and-microtasks-in-javascript-what-every-developer-should-know-53mc)
 
-Прежде чем попасть в micro/macrotask queue команды обрабатываются в webAPI.  
+>Прежде чем попасть в micro/macrotask queue команды обрабатываются в webAPI.  
 Например, `setTimeout(() => {}, delay)` попадет в очередь после `delay` мс.  
 Поэтому, если за время ожидания (`delay`) произойдут более быстрые асинхронные события, например срабатывание `click` (при установнном eventListener), то они попадут в очередь быстрее таймера.  
-
->События быстрее нулевого таймера (`setTimeout(() => {}, 0)`), так как не заходят в webAPI. Окажутся в очереди раньше, чем макротаска таймера
 
 [Вернуться к содержанию](#содержание)
 
@@ -2234,13 +2233,13 @@ document.cookie = "age=21";
 console.log(document.cookie); // "first_name=petr; age=21"
 ```  
 Дополнительные параметры можно передать через `;`: `document.cookie = 'name=petr;secure;max-age=100'`  
-* path - роут по которому доступна кука
-* domain - домен для куки (по умолчанию текущий). `.` перед доменом разрешает доступ ко всем поддоменам: `.my-domain.ru` 
-* max-age - время жизни куки в секундах
-* expires - точное время, когда кука станет недействительной  
+* `path` - роут по которому доступна кука
+* `domain` - домен для куки (по умолчанию текущий). `.` перед доменом разрешает доступ ко всем поддоменам: `.my-domain.ru` 
+* `max-age` - время жизни куки в секундах
+* `expires` - точное время, когда кука станет недействительной  
 Для удаления куки устанавливается дата в прошлом `expires=${new Date(0)}`
-* secure - возможность передачи куки только по HTTPS
-* samesite - определяет возможность отправки при кроссдоменном запросе (strict - запрещено, lax - разрешено с GET-запросом)
+* `secure` - возможность передачи куки только по HTTPS
+* `samesite` - определяет возможность отправки при кроссдоменном запросе (strict - запрещено, lax - разрешено с GET-запросом)
 
 Если название куки начинается с `__Secure-`, то обязательно должны быть установлен параметр `secure`  
 Если название куки начинается с `__Host-`, то обязательно должны быть установлены параметры `path` и `secure` и исключен `domains`  
@@ -2251,21 +2250,21 @@ console.log(document.cookie); // "first_name=petr; age=21"
 ### 16.2 Web Storage
   
 Методы работы с `localStorage`, `sessionStorage`:  
-* setitem(key, value) - установка/изменение данных. Данные хранятся в формате String
-* getItem(key) - получение данных по ключу `key` или null
-* removeItem(key) - удаление данных
-* clear() - полная очистка хранилища
-* length - количество полей в хранилище
-* key(index) - получение ключа по индексу
+* `setitem(key, value)` - установка/изменение данных. Данные хранятся в формате String
+* `getItem(key)` - получение данных по ключу `key` или null
+* `removeItem(key)` - удаление данных
+* `clear()` - полная очистка хранилища
+* `length` - количество полей в хранилище
+* `key(index)` - получение ключа по индексу
 ```javascript
 const person = { name: 'Petr', age: 18 }
 window.localStorage.setItem('person', JSON.stringify(person))
 ```
 При установке значения в `localStorage` срабатывает событие `storage`, в котором доступны свойства:  
-* key - ключ, который был изменен (при вызове метода clear - null)
-* oldValue - старое значение
-* newValue - новое значение
-* url - адрес страницы, на которой произошло изменение
+* `key` - ключ, который был изменен (при вызове метода clear - null)
+* `oldValue` - старое значение
+* `newValue` - новое значение
+* `url` - адрес страницы, на которой произошло изменение
 
 >Браузеры автоматически удаляют данные из хранилища по определенным условиям  
 Для постоянного хранения данных нобходимо вызвать `window.navigator.storage?.persist()`  
@@ -2276,55 +2275,55 @@ window.localStorage.setItem('person', JSON.stringify(person))
 
 Способ хранения большого объема данных в БД браузера. В отличие от Web Storage сохраняет файлы, объекты, примитивные типы.  
 
-* IDBFactory - интерфейс доступа к БД
-	* IndexedDB.open(name[, version]) - открытие соединения с БД (создание и открытие, если не существует). Возвращает IDBOpenDBRequest
-	* IndexedDB.deleteDatabase(name) - удаление БД
-	* IndexedDB.databases() - возвращает массив объектов содержащих имена-версии всех доступных БД  
-* IDBRequest
-	* IDBRequest.result - результат запроса
-	* error - **событие** срабатывает при ошибке запроса к БД
-	* success - **событие** срабатывает при успешном запросе к БД
-* IDBOpenDBRequest - интерфейс предоставляет доступ к результатам запросов на открытие или удаление БД  
+* `IDBFactory` - интерфейс доступа к БД
+	* `IndexedDB.open(name[, version])` - открытие соединения с БД (создание и открытие, если не существует). Возвращает IDBOpenDBRequest
+	* `IndexedDB.deleteDatabase(name)` - удаление БД
+	* `IndexedDB.databases()` - возвращает массив объектов содержащих имена-версии всех доступных БД  
+* `IDBRequest`
+	* `IDBRequest.result` - результат запроса
+	* `error` - **событие** срабатывает при ошибке запроса к БД
+	* `success` - **событие** срабатывает при успешном запросе к БД
+* `IDBOpenDBRequest` - интерфейс предоставляет доступ к результатам запросов на открытие или удаление БД  
 Интерфейс не содержит собственных методов, наследуется от IDBRequest
-	* blocked - **событие** срабатывает, когда открытое соединение с БД блокиреут транзакцию на той же БД
-	* upgradeneeded - **событие** срабатывает в случае обращения к БД с версией превышающей текущую версию БД
-* IDBDatabase - интерфейс для управления транзакциями БД
-	* IDBDatabase.close() - закрывает соединение с БД
-	* IDBDatabase.createObjectStore(name[, options]) - создает и возвращает новое объектное хранилище с именем `name`  
-		* keyPath - уникальный ключ идентификации элемента в объектном хранилище
-		* autoIncrement - boolean. Необязательное поле в опциях для автоинкретента ключа (по умолчанию false)  
+	* `blocked` - **событие** срабатывает, когда открытое соединение с БД блокиреут транзакцию на той же БД
+	* `upgradeneeded` - **событие** срабатывает в случае обращения к БД с версией превышающей текущую версию БД
+* `IDBDatabase` - интерфейс для управления транзакциями БД
+	* `IDBDatabase.close()` - закрывает соединение с БД
+	* `IDBDatabase.createObjectStore(name[, options])` - создает и возвращает новое объектное хранилище с именем `name`  
+		* `keyPath` - уникальный ключ идентификации элемента в объектном хранилище
+		* `autoIncrement` - boolean. Необязательное поле в опциях для автоинкретента ключа (по умолчанию false)  
 		Совместное использование опций приведет к ошибке  
-	* IDBDatabase.deleteObjectStore(name) - удаление объектного хранилища 
-	* IDBDatabase.transaction(storeNames[, mode[, options]]) - создание новой транзакции (IDBTransaction), где  
-		* storeNames - объектное хранилище или массив объектных хранилищ
-		* mode - режим транзации (readonly - только чтение, readwrite - чтение и запись)
-		* options = объект с полем durability (правило устойчивости транзакций).  
+	* `IDBDatabase.deleteObjectStore(name)` - удаление объектного хранилища 
+	* `IDBDatabase.transaction(storeNames[, mode[, options]])` - создание новой транзакции (IDBTransaction), где  
+		* `storeNames` - объектное хранилище или массив объектных хранилищ
+		* `mode` - режим транзации (readonly - только чтение, readwrite - чтение и запись)
+		* `options` = объект с полем durability (правило устойчивости транзакций).  
 		Значения: `strict` - данные должны быть устойчивы к сбою (наибольшая ресурсозатратность), `relaxed` - допускается потеря данных (используется для быстро меняющихся данных), `default` - стандартное поведение браузера
-* IDBTransaction - интерфейс транзакции 
-	* IDBTransaction.db - БД, к которой привязана транзакциями
-	* IDBTransaction.durability - возвращает значение устойчивости транзакции
-	* IDBTransaction.mode - возвращает значение режима транзакции
-	* IDBTransaction.error - возвращает DOMException в случае ошибки в транзакции
-	* IDBTransaction.objectStoreNames - возвращает DOMStringList с именами IDBObjectStore связанных с транзакцией
-	* IDBTransaction.abort() -метод откатывающий все изменения в БД связанные с транзакцией
-	* IDBTransaction.objectStore(name) -метод возвращающий IDBObjectStore связанный с транзакцией
-* IDBObjectStore - интерфейс объектного хранилища в БД
-	* IDBObjectStore.indexNames - список имен индексов объектного хранилища
-	* IDBObjectStore.keyPath - keyPath объектного хранилища
-	* IDBObjectStore.name - name объектного хранилища
-	* IDBObjectStore.transaction - транзакция связанная с объектным хранилищем
-	* IDBObjectStore.autoIncrement - autoIncrement объектного хранилища
-	* IDBObjectStore.add(value, key) - добавляет запись в объектное хранилище
-	* IDBObjectStore.put(item, key) - обновляет или создает новую запись
-	* IDBObjectStore.delete(key) - удалят запись в хранилище по ключу или диапазону ключей (IDBKeyRange)
-	* IDBObjectStore.createIndex(indexName, keyPath[, options]) - создает новый индекс. Возвращает IDBIndex 
-	* IDBObjectStore.deleteIndex(indexName) - удаляет индек
-	* IDBObjectStore.clear([query]) - очищает объектное хранилище от всех записей (query - диапазон IDBKeyRange для удаления)
-	* IDBObjectStore.get(key) - возвращает запись по заданному ключу или диапазону ключей (IDBKeyRange)
-	* IDBObjectStore.getAll([query[, count]]) - возвращает все (или count) записей по ключу `query` или диапазону ключей (IDBKeyRange) 
-	* IDBObjectStore.count() - возвращает количество записей в объектном хранилище
-	* IDBObjectStore.index(name) - открывает индекс для доступа к серии записей по данному индексу
-	* и т.д.
+* `IDBTransaction` - интерфейс транзакции 
+	* `IDBTransaction.db` - БД, к которой привязана транзакциями
+	* `IDBTransaction.durability` - возвращает значение устойчивости транзакции
+	* `IDBTransaction.mode` - возвращает значение режима транзакции
+	* `IDBTransaction.error` - возвращает DOMException в случае ошибки в транзакции
+	* `IDBTransaction.objectStoreNames` - возвращает DOMStringList с именами IDBObjectStore связанных с транзакцией
+	* `IDBTransaction.abort()` -метод откатывающий все изменения в БД связанные с транзакцией
+	* `IDBTransaction.objectStore(name)` -метод возвращающий IDBObjectStore связанный с транзакцией
+* `IDBObjectStore` - интерфейс объектного хранилища в БД
+	* `IDBObjectStore.indexNames` - список имен индексов объектного хранилища
+	* `IDBObjectStore.keyPath` - keyPath объектного хранилища
+	* `IDBObjectStore.name` - name объектного хранилища
+	* `IDBObjectStore.transaction` - транзакция связанная с объектным хранилищем
+	* `IDBObjectStore.autoIncrement` - autoIncrement объектного хранилища
+	* `IDBObjectStore.add(value, key)` - добавляет запись в объектное хранилище
+	* `IDBObjectStore.put(item, key)` - обновляет или создает новую запись
+	* `IDBObjectStore.delete(key)` - удалят запись в хранилище по ключу или диапазону ключей (IDBKeyRange)
+	* `IDBObjectStore.createIndex(indexName, keyPath[, options])` - создает новый индекс. Возвращает IDBIndex 
+	* `IDBObjectStore.deleteIndex(indexName)` - удаляет индек
+	* `IDBObjectStore.clear([query])` - очищает объектное хранилище от всех записей (query - диапазон IDBKeyRange для удаления)
+	* `IDBObjectStore.get(key)` - возвращает запись по заданному ключу или диапазону ключей (IDBKeyRange)
+	* `IDBObjectStore.getAll([query[, count]])` - возвращает все (или count) записей по ключу `query` или диапазону ключей (IDBKeyRange) 
+	* `IDBObjectStore.count()` - возвращает количество записей в объектном хранилище
+	* `IDBObjectStore.index(name)` - открывает индекс для доступа к серии записей по данному индексу
+	* `и т.д.`
 >Все операции с IndexDB асинхронны и возвращают промис
 
 ```javaScript
