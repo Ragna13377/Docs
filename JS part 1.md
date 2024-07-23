@@ -2087,19 +2087,23 @@ three()
 Пример:
 ```javascript
 console.log('Synchronized start');
+const myPromise = new Promise((resolve) => {
+	console.log('Before promise timeout')
+	setTimeout(() => {
+		console.log('Before promise resolve')
+		resolve('Microtask completed')
+		console.log('After promise resolve')
+	}, 0)
+	console.log('After promise timeout')
+})
 setTimeout(() => {
-  console.log('Macrotask 1: setTimeout');
+  console.log('Macrotask setTimeout');
 }, 0);
-setTimeout(() => {
-  console.log('Macrotask 2: setTimeout');
-}, 0);
-Promise.resolve()
-   .then(() => {
-     console.log('Microtask 1: first promise completed');
+myPromise
+   .then((res) => {
+     console.log(res);
    })
-   .then(() => {
-     console.log('Microtask 2: second promise completed');
-   });
+Promise.resolve().then(() => console.log('Resolve microtask'))
 requestAnimationFrame(() => {
   console.log('First requestAnimationFrame: animation update');
 });
@@ -2110,14 +2114,17 @@ requestAnimationFrame(() => {
 console.log('Synchronized end');
 ```
 Последовательность вывода:  
-* Synchronized start
-* Synchronized end
-* Microtask 1: first promise completed
-* Microtask 2: second promise completed
-* First requestAnimationFrame: animation update
-* Second requestAnimationFrame: animation update
-* Macrotask 1: setTimeout
-* Macrotask 2: setTimeout  
+1. Synchronized start
+2. Before promise timeout
+3. After promise timeout
+4. Synchronized end
+5. Resolve microtask
+6. First requestAnimationFrame: animation update
+7. Second requestAnimationFrame: animation update
+8. Before promise resolve
+9. After promise resolve
+10. Microtask completed
+11. Macrotask setTimeout
 
 На очередность также влияет процесс перерисовки страницы. Он вмешивается в общую очередь по правилам "под капотом" браузера (Render queue).
 Браузер пытается вставить requestAnimationFrame в ближайший рендеринг, поэтому `requestAnimationFrame` стремятся происходить примерно раз в 16 мс, но строго после выполнения всех микротасок.  
