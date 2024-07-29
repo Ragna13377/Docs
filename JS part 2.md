@@ -654,7 +654,7 @@ const proxy = new Proxy(target, {
 		else return 'defaultValue'
 	}
 })
-console.log(proxy.immutableProp); // 42
+console.log(proxy.immutableProp); // Petr
 console.log(proxy.accessorProp); // undefined
 console.log(proxy.unknownProp); // defaultValue
 ```  
@@ -834,7 +834,7 @@ console.log(person2.name) // Olga
 >const proxyMap = new Proxy(target, {})
 >proxy.set('name', 'Petr'); // ошибка
 >```
->Решение проблемы - привязка свойств-функции к контексту оригинального объекта: 
+>Решение проблемы - привязка свойств-функций к контексту оригинального объекта: 
 >```javascript
 >const target = new Map()
 >const proxyMap = new Proxy(target, {
