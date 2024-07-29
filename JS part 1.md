@@ -218,7 +218,7 @@ console.log(arrayMatchAll[1]); // Array ["test2", "e", "st2", "2"]
 Правильный способ определения длины строки: `str.split('').length`,  `[...str].length`  
 
 **Задача на поворот (reverse) строки:**  
-[Устройство Emoji в юникоде (малополезно) ](https://habr.com/ru/companies/itelma/articles/549366/) 
+[Устройство Emoji в юникоде (малополезно) ](https://habr.com/ru/companies/itelma/articles/549366/){target="_blank"} 
 ```javaScript
 const str = 'hello 😀 ☹️ 👦🏿 👨🏻‍🏫 🇬 1️⃣  👩‍🦰👩‍👩‍👦‍👦
 ```
@@ -2072,7 +2072,7 @@ three()
  
 1. все вызовы из Call Stack
 2. все вызовы из Microtask queue
-3. 1 вызов из Microtask queue (если Call Stack и Microtask queue пусты, то выполняется следующая Macrotask)  
+3. 1 вызов из Macrotask queue (если Call Stack и Microtask queue пусты, то выполняется следующая Macrotask)  
 
 **Микротаски создают:**
 * Promise
@@ -2158,8 +2158,8 @@ export default const data = ''
 // another module
 import exportData from './index.js' 
 ```
-Именованный и импорт по умолчанию можно объединять: `import defaultImport, { namdedImbport } from './index.js'`  
-[Примеры именованного экспорта и экспорта по умолчанию](https://www.youtube.com/watch?v=TtSemE_0F2k)  
+Именованный и импорт по умолчанию можно объединять: `import defaultImport, { namedImport } from './index.js'`  
+[Примеры именованного экспорта и экспорта по умолчанию](https://www.youtube.com/watch?v=TtSemE_0F2k)
 - Множественный (импорт всех экспортируемых данных): `import * as data from './index.js'`
 
 При импортировании данных, можно изменить название через ключевое слово `as`: `import { data as exportData } from './index.js' `
@@ -2198,7 +2198,7 @@ worker.onmessage = (e) => { console.log(e) }
 // завершение работы воркера
 myWorker.terminate();
 
-// woker.JS
+// woker.js
 onmessage = (e) => {
 	console.log(e.message)
 	postMessage({age: 18})
