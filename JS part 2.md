@@ -27,8 +27,12 @@
 	- [4.4 Якоря](#44-якоря)
 	- [4.5 Квантификаторы](#45-квантификаторы)
 	- [4.6 Скобочные группы](#46-скобочные-группы)
-* [5. Дополнительно](#5-дополнительно) 
-	- [5.1 Скачивание файла](#51-скачивание-файла)  
+* [5. Proxy, Reflect](#5-proxy-reflect)  
+	- [5.1 proxy](#51-proxy)  
+	- [5.2 reflect](#52-reflect)  
+* [6. Классы](#6-классы)  
+* [7. Дополнительно](#5-дополнительно) 
+	- [7.1 Скачивание файла](#71-скачивание-файла)  
 
 ## 1. DOM
 
@@ -226,10 +230,10 @@ document.getElementById('templateID').content.firstElementChild.cloneNode(true)
 
 ### 1.11 События страницы
 
-События в JS проходят через 3 фазы:  
+Распространение событий в JS проходят через 3 фазы:  
 1. Фаза захвата (Capture Phase) - идет поиск целевого элемента от корня DOM
 2. Фаза целевого элемента (Target Phase) - cобытие достигло целевого элемента, на котором оно было вызвано
-3. Фаза всплытия (Bubble Phase) - cобытие начинает всплывать от целевого элемента к корню DOM  
+3. Фаза всплытия (Bubble Phase) - cобытие начинает всплывать от целевого элемента к корню DOM, вызывая обработчики на каждом промежуточном элементе  
 >На фазах захвата и всплытия событие можно перехватывать  
 
 Способы обработки событий:  
@@ -594,9 +598,421 @@ console.log(matches); // ["\"text\"", "\"here\""]
 
 [Вернуться к содержанию](#содержание)
 
-## 5. Дополнительно
+## 5. Proxy, Reflect
 
-### 5.1 Скачивание файла
+### 5.1 Proxy  
+
+**Proxy** - специальный объект-обертка над целевым объектом, создающий "ловушки" (traps) для перехвата операций над целевым объектом:   
+`let proxy = new Proxy(target, handler)`, где  
+* `trap` - метод, перехватывающий операции над целевым объектом
+* `target` - целевой объект  
+* `handler` - конфигурация с ловушками. Пустой handler перенаправляет все операции на целевой объект
+
+Количество операций, которые можно перехватить ловушками ограничены:  
+
+|Операция|Ловушка|Вызов|
+|----|----|----|
+|getPrototypeOf|getPrototypeOf|образение к прототипу объекта `Object.getPrototypeOf()`|
+|setPrototypeOf|setPrototypeOf|установка прототипа объекта `Object.setPrototypeOf()`|
+|isExtensible|isExtensible|при проверке объекта на расширяемость `Object.isExtensible()`|
+|preventExtensions|preventExtensions|при попытке сделать объект нерасширяемым `Object.preventExtensions()`|
+|getOwnProperty|getOwnPropertyDescriptor|при получении дескриптора свойства `Object.getOwnPropertyDescriptor()`|
+|defineProperty|defineOwnProperty|при определении/изменении свойства `Object.defineProperty()`|
+|hasProperty|has|проверка существования свойства `in`|
+|get|get|чтение свойства|
+|set|set|запись свойства|
+|delete|deleteProperty|удаление свойства `delete`|
+|ownPropertyKeys|ownKeys|при перечислении свойств объекта `keys, values, entries, for...in, Object.getOwnPropertyNames, Object.getOwnPropertySymbols`|
+|call|apply|при вызове функции|
+|construct|construct|при использовании `new`|
+
+ECMAScript накладывает условия на реализацию многих типов ловушек: [подробнее](https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots)  
+**Примеры:**  
+**Ловушка `get(target, property, value, receiver)`** должна возвращать значение свойства, к которому было обращение, если оно является собственным (не унаследованным), неизменяемым (`writable: false`) и неконфигурируемым (`configurable: false`) за исключением случая, когда свойства не существует  
+Значение для неконфигурируемого (`configurable: false`) собственного (не унаследованного) свойства, у которого поле `get` равно `undefined` должно возвращать `undefined`  
+```javascript
+const target = {}
+Object.defineProperties(target, {
+	immutableProp: {
+		value: 'Petr',
+		writable: false, // неизменяемое
+		configurable: false // неконфигурируемое
+	},
+	accessorProp: {
+		get: undefined, // атрибут [[Get]] равен undefined
+		set: (value) => {
+			this._accessorProp = value;
+		},
+		configurable: false // неконфигурируемое
+	}
+})
+const proxy = new Proxy(target, {
+	get(target, property) {
+		if (property in target) return target[property];
+		else return 'defaultValue'
+	}
+})
+console.log(proxy.immutableProp); // 42
+console.log(proxy.accessorProp); // undefined
+console.log(proxy.unknownProp); // defaultValue
+```  
+**Ловушка `set(target, property, value, receiver)`** должна возвращать boolean.  
+Нельзя изменить значение так, чтобы оно отличалось от соответствующего свойства в оригинальном объекте, для собственного (не унаследованного), неизменяемого (`writable: false`), неконфигурируемого (`configurable: false`) свойства    
+Изменение значения должно быть заблокировано для собственного (не унаследованного), неконфигурируемого (`configurable: false`) свойства, у которого поле `set` равно undefined попытка  
+
+```javascript
+const target = {}
+Object.defineProperties(target, {
+    immutableProp: {
+        value: 'Petr',
+        writable: false, // неизменяемое
+        configurable: false // неконфигурируемое
+    },
+    accessorProp: {
+        get: () => 'Getting value for accessorProp', 
+        set: (value) => undefined, // атрибут [[Set]] равен undefined
+        configurable: false // неконфигурируемое
+    }
+});
+const proxy = new Proxy(target, {
+	set(target, property, value) {
+		const descriptor = Object.getOwnPropertyDescriptor(target, property);
+		if (descriptor && !descriptor.configurable && (!descriptor.writable || descriptor.set === undefined)) {
+				if (descriptor.value !== value) {
+						return false;
+				}
+		}
+		target[property] = value;
+		return true;
+	}
+})
+console.log(proxy.immutableProp); // Petr
+proxy.immutableDataProp = 21; // попытка изменения значения неизменяемого и неконфигурируемого свойства
+console.log(proxy.immutableProp); // Petr
+console.log(proxy.accessorProp); // Getting value for accessorProp
+proxy.accessorProp = 21; // попытка изменения значения неконфигурируемого свойства с set равным undefined
+console.log(proxy.accessorProp); // Getting value for accessorProp
+proxy.customProp = 21;
+console.log(proxy.customProp); // 21
+``` 
+**Ловушка `has(target, property)`** - должна возвращать boolean.  
+Свойство не может быть указано несуществующим, если оно существует как неконфигурируемое (`configurable: false`) собственное (не унаследованное) свойство целевого объекта  
+Свойство не может быть указано несуществующим, если оно существует как собственное (не унаследованное) свойство целевого объекта, а сам объект является нерасширяемым (`Object.isExtensible() === false`)
+```javascript
+const target = {};
+Object.defineProperties(target, {
+    configurableProp: {
+        value: 1,
+        configurable: false
+    },
+    extensibleProp: {
+        value: 2,
+        configurable: true
+    }
+});
+Object.preventExtensions(target);
+const proxy = new Proxy(target, {
+	has(target, property) {
+		const descriptor = Object.getOwnPropertyDescriptor(target, property);
+		if (descriptor && !descriptor.configurable) return true
+		return descriptor && !Object.isExtensible(target) ? true : false
+	}
+})
+console.log('configurableProp' in proxy); // true, потому что свойство существует и неконфигурируемое
+console.log('extensibleProp' in proxy); // true, потому что свойство существует
+console.log('nonExistentProp' in proxy); // false, такое свойство не существует
+```
+**Ловушка `delete(target, property)`** - должна возвращать boolean.  
+Нельзя удалить собственное (не унаследованне), неконфигурируеме (`configurable: false`) свойство  
+Нельзя удлить собственное (не унаследованне) свойство в нерасширяемом целевом объекте (`Object.isExtensible() === false`)  
+**Ловушка `ownKeys(target)`** - должна возврашать список ключей (`string` или `symbol`) всех собственных (не унаследованных) свойств целевого объекта   
+В списке должны содержаться ключи всех неконфигурируемых (`configurable: false`) собственных (не унаследованных) свойств  
+Если целевой объект не расширяем (`Object.isExtensible() === false`), то список должен содержать только ключи собственных свойств целевого объекта 
+Ключи в списке не должны повторяться.  
+И т.д. все условия описаны [здесь](https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots)   
+**Ловушка `getOwnPropertyDescriptor(target, property)`** должна возвращать объект или undefined.  
+Свойство не может быть признано несуществующим, если оно существует в целевом объекте как неконфигурируемое (`configurable: false`) собственное (не унаследованное) свойство или собственное свойство.  
+Свойство не может быть признано несуществующим, если оно существует как собственное свойство в нерасширяемом объекте.  
+A property cannot be reported as non-configurable, unless it exists as a non-configurable own property of the target object.
+A property cannot be reported as both non-configurable and non-writable, unless it exists as a non-configurable, non-writable own property of the target object.
+**Ловушка `defineProperty(target, property, descriptor)`** должна возвращать boolean.  
+Свойство не может быть добавлено к нерасширяемому объекту (`Object.isExtensible() === false`).  
+Неконфигуреруемое  (`configurable: false`) свойство не может стать неизменияемым (`writtable: false`), если для него существует соответствующее собственное (не унаследованное) неконфигурируемое свойства целевого объекта.  
+Применение дескриптора к свойству не должно вызывать ошибку, если существует соответствующее собственное (не унаследованное) свойство целевого объекта. 
+A property cannot be non-configurable, unless there exists a corresponding non-configurable own property of the target object
+**Ловушка `apply(target, thisArg, argumentsList)`** применима только к целевому объекту, который является вызываемым (имеет метод `call()`)
+**Ловушка `construct(target, argumentsList, newTarget)`** должна возвращать объект.  
+Применима только к целевому объекту, у которого есть внутренний метод `construct` (т.е. вызов через `new`)  
+**Ловушка `isExtensible(target)`** должна возвращать boolean, значение которого должно быть таки же, что и примененый `Object.isExtensible()` к целевому объекту
+**Ловушка `preventExtensions(target)`** должна возвращать boolean. True - только в том случае, когда объект не расширяем (`Object.isExtensible() === false`)
+**Ловушка `getPrototypeOf(target)`** должна возвращать объект или null.  
+Когда целевой объект не расширяем (`Object.isExtensible() === false`), ловушка возвращает то же значение, что и примененный `Object.getPrototypeOf()` к целевому объекту
+**Ловушка `setPrototypeOf(target, prototype)`** - должна возвращать boolean.  
+Когда целевой объект не расширяем (`Object.isExtensible() === false`), то значение `prototype` то же, что и возвращаемое значение метода `Object.getPrototypeOf()` примененного к целевому объекту
+
+**Отключаемые прокси** - прокси, который может быть отключен от оригинального объекта  
+```javascript
+const target = { name: 'Petr' }
+const {proxy, revoke} = Proxy.revocable(target, handler) 
+// отключение прокси
+revoke();
+proxy.name // ошибка, прокси отключен
+```
+
+### 5.2 Reflect   
+
+**Reflect** - встроенный объект, упрощающий работу с Proxy   
+Для каждой ловушки в `Proxy` существует метод в `Reflect`, имеющий те же аргументы   
+**Пример 1 (сокращение кода - уменьшает вероятность создания ошибок в сложных ловушках)**  
+```javascript
+let target = {
+	name: 'Petr'
+};
+
+const proxy = new Proxy(target, {
+	get(target, prop, receiver) {
+		console.log('Get trap');
+		return Reflect.get(target, prop, receiver);
+		// Без использования Reflect
+		// return target[prop];
+	},
+	set(target, prop, val, receiver) {
+		console.log('Set trap');
+		return Reflect.set(target, prop, val, receiver);
+		// Без использования Reflect
+		// target[prop] = value;
+		// return true;
+	}
+});
+console.log(proxy.name)
+proxy.name = 'Olga'
+```
+**Пример 2 (сохранение контекста)**  
+Проблема: В объекте `person1` отсутствует поле `name`.  
+При обращении к нему свойство ищется в прототипе (`proxyWithoutReflex`), где срабатывает ловушка и возвращается значение из объекта `target`  
+Решение проблемы сохранения контекста: `return prop in receiver ? receiver[prop] : target[prop]`, что аналогично применению `Reflect` в `proxyWithReflex`
+```javascript
+let target = {
+	_name: 'Petr',
+	get name() {
+    return this._name;
+  }
+};
+let proxyWithoutReflex = new Proxy(target, {
+  get(target, prop, receiver) {
+    return target[prop];
+  }
+});
+let proxyWithReflex = new Proxy(target, {
+  get(target, prop, receiver) {
+    return Reflect.get(target, prop, receiver);
+  }
+});
+
+let person1 = {
+  __proto__: proxyWithoutReflex,
+  _name: "Olga"
+};
+let person2 = {
+  __proto__: proxyWithReflex,
+  _name: "Olga"
+};
+console.log(person1.name) // Petr
+console.log(person2.name) // Olga
+```  
+
+>Встроенные объекты (например Map, Set, Date, Promise и т.д., **кроме Array**) используют внутренние слоты, которые не может перехватить Proxy  
+Аналогичное поведение приватных свойства классов  
+>```javascript
+>const target = new Map()
+>const proxyMap = new Proxy(target, {})
+>proxy.set('name', 'Petr'); // ошибка
+>```
+>Решение проблемы - привязка свойств-функции к контексту оригинального объекта: 
+>```javascript
+>const target = new Map()
+>const proxyMap = new Proxy(target, {
+>	get(target, prop, receiver) {
+> let value = Reflect.get(target, prop, receiver);
+> return typeof value == 'function' ? value.bind(target) : value;
+>	}
+>})
+>proxy.set('name', 'Petr'); // ошибка
+>```
+
+[Еще примеры на видео, если не хватило](https://www.youtube.com/watch?v=NQIsue1YeO8)  
+[Почитать дополнительно](https://learn.javascript.ru/proxy#reflect)  
+
+## 6 Классы
+
+Класс - шаблон для создания однотипных объектов.  
+Внутри классов можно создавать собственные (не доступные в прототипе) свойства, вычисляемые свойства, геттеры/сеттеры, методы.   
+Методы в классе являются неперечислимыми (`enumerable: false`):
+  
+```javascript
+class Person {
+	// собственное свойство
+	role = 'Admin';
+	constructor(nameKey, nameValue, age) {
+		// вычисляемое свойство
+		this[nameKey] = nameValue
+		this.age = age
+	}
+	 get city() {
+    return this._city;
+  }
+	set city(value) {
+		this._city = value;
+	}
+	calculateAge(){
+		const currentYear = new Date().getFullYear();
+		return currentYear - this.age
+	}
+}
+const nameKey = 'firstName'
+
+const person = new Person(nameKey, 'Petr', 2000)
+person.city = 'Moscow'
+console.log(person.role);
+console.log(person.firstName)
+console.log(person.age)
+console.log(person.city)
+console.log(person.calculateAge())
+```
+
+**Class Expression** - классам доступно определение внутри другого выражения, присваивание, возвращение из функции (аналогично Function Expression):  
+```javascript
+const person = class { method(){} }
+const namedPerson = class Person { method(){} }
+function makeClass() {
+	return class { method() {} }
+}
+new person().method()
+new namedPerson().method()
+const functionPerson = makeClass()
+new functionPerson().method()
+```
+
+`instanseof` - оператор проверяет является ли объект экземпляром конструктора или класса (просматривая цепочку прототипов)  
+```javascript
+const arr = [];
+console.log(arr instanceof Array) // true
+console.log(arr instanceof Object) // true т.к. Array наследуется от Object
+```
+
+### 6.1 Наследование классов   
+
+Наследование - функционал расширения одного класса другим, когда расширяемый класс получает доступ к методам и свойствам наследуемого класса  
+Конструктор в наследующем классе **должен обязательно** вызывать `super()` перед использованием `this`, т.к. конструктор наследующего класса не создает пустого объекта с привязкой `this`  
+_Методы наследуемого класса могут быть переопределены_  
+Собственные свойства не переопределяются при использовании родительского конструктора
+```javascript
+class Human {
+	planet = 'Earth';
+	constructor() {
+		this.race = 'human';
+	}
+	getInfo() {
+		console.log('Your race is ' + this.race)
+	}
+}
+class Warrior extends Human {
+	planet = 'Mars'
+	constructor() {
+		super();
+		this.strength = 50;
+	}
+	// переопределение наследуемого метода
+	getInfo() {
+		// базовая реализация метода наследуемого класса
+		super.getInfo()
+		// дополнительный функционал текущего класса
+		console.log('Your strength is ' + this.strength)
+	}
+}
+const warrior  = new Warrior()
+warrior.getInfo()
+// собственное свойство не переопределено
+console.log(warrior.planet) // Earth
+```
+>Также стоит отметить, что стрелочные функции не имеют собственного контекста и не могут использовать `super`  
+>`getInfo = () => { supet.getInfo() }` приведет к ошибке
+
+**Пример наследования от Class Expression**  
+```javascript
+function myFunction(name) {
+	return class {
+		getName() { console.log(name) }
+	}
+}
+class Person extends myFunction('Petr') {}
+new Person.getName()
+```
+
+**Примеси** - методы, реализующие определенное поведение, функционал которыех можно добавить к другим классам 
+```javascript
+const mixin = {
+	getInfo() {
+		console.log('Info')
+	}
+}
+class Person {
+	constructor(name) {
+		this.name = name
+	} 
+}
+Object.assign(Person.prototype, mixin)
+const person = new Person('Petr')
+person.getInfo()
+```
+
+### 6.2 Виды методов и свойств
+
+**Статические методы и свойства** - методы и свойства принадлежащие классу, но не инстансу  
+Статические методы и свойства наследуются.  
+```javascript
+class Person {
+	static role = 'user';
+	constructor(name) {
+		this.name = name
+	}
+	static getSecureInfo() {
+		console.log('Secure info')
+	}
+	// статический метод для создания инстанса класса
+	static createPerson(name) {
+		return new this(name)
+	}
+}
+const person = new Person();
+try {
+  person.getSecureInfo() // ошибка. отсутствующий метод
+}
+catch(error) {
+  console.log('catch static method error')
+}
+Person.getSecureInfo() // Secure info
+const user = Person.createPerson('Petr');
+console.log(user.name)
+```
+
+Поля (свойства и методы) класса могутбыть приватными и публичными. Защищенных полей в JS нет, они эмулируются.  
+Все предыдущие примеры рассматривали работу публичных полей.  
+Защищенные поля (начинаются с префикса `_`) доступны внутри класса и наследуемых классов (это лишь соглашение).  
+Приватные поля (начинаются с префикса `#`) **доступны только** внутри класса.  
+```javascript
+class Person {
+	_city = 'Moscow'  
+	#role = 'user'
+}
+const person = new Person()
+console.log(person._city) // Moscow. Доступ есть, но по соглашению, прямое обращение к защищенным полям вне классов не используется
+console.log(person.#role) // ошибка обращения к приватному свойству
+```
+
+## 7. Дополнительно
+
+### 7.1 Скачивание файла
 
 Способ скачивания файла в браузере:
 1. `<a download="filename.png"></a>`  
