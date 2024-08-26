@@ -1156,7 +1156,7 @@ mixed - повернуты на 90deg, upright - друг под другом
 
 [Вернуться к содержанию](#содержание)
 
-## 2.8 Гриницы
+## 2.8 Границы
 
 * `border-style` - стиль рамки элемента (none, solid, dotted, dashed, double, groove, ridge, inset, outset)
 * `border-color` - цвет рамки элемента
