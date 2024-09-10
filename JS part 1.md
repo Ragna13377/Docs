@@ -218,7 +218,7 @@ console.log(arrayMatchAll[1]); // Array ["test2", "e", "st2", "2"]
 Правильный способ определения длины строки: `str.split('').length`,  `[...str].length`  
 
 **Задача на поворот (reverse) строки:**  
-[Устройство Emoji в юникоде (малополезно) ](https://habr.com/ru/companies/itelma/articles/549366/){target="_blank"} 
+[Устройство Emoji в юникоде (малополезно) ](https://habr.com/ru/companies/itelma/articles/549366/) 
 ```javaScript
 const str = 'hello 😀 ☹️ 👦🏿 👨🏻‍🏫 🇬 1️⃣  👩‍🦰👩‍👩‍👦‍👦
 ```
@@ -1576,7 +1576,7 @@ console.log(testSet.union(anotherSet)) // Set(4) {1,3,5,7,9,4}
 Элемент удаляется, если в коде он нигде не используется (нет сильных ссылок):  
 ```javascript
 let obj = {name: 'Petr'}  
-const testWeakMap = new WeakMap{[obj: 'Data']}  
+const testWeakMap = new WeakMap([obj: 'Data'])  
 obj = null // удалили объект и более он нигде не используется  
 testWeakMap.has(obj) // false` - элемент был удален сборщиком мусора  
 ```
