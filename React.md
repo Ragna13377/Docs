@@ -397,7 +397,7 @@ funсtion App() {
 }
 ```
 
-## Пример 1
+## Пример
 
 Функцию обратного вызова можно реализовать в родительском компоненте, а в дочернем передавать в нее параметры  
 ```typescript
@@ -410,36 +410,6 @@ function App() {
 const MyComponent = ({getValue}: MyComponentProps) => {
 	{getValue(param1, param2)}
 	...остальная логика компонента
-}
-```
-
-## Пример 2  
-
-Через функцию обратного вызова можно возвращать children (паттерн Render Props)  
-_Пригодится в Next при передаче пропсов между серверными и клиентскими компонентами_
-```typescript
-function App() {
-	return (
-		<MyComponent>
-			{/*функция обратного вызова*/}
-			{(age, name) => (
-					<form>
-						<label>{name}</label>
-						<p>{age}</p>
-					</form>
-				)
-			}
-		</MyComponent>
-	)
-}
-
-type Props = {
-  children: (age: number, name: string) => JSX.Element
-}
-function MyComponent({children}: Props) {
-	const name = 'Petr'
-	const age = 18
-	return children(age, name)
 }
 ```
 
