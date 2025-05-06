@@ -17,24 +17,21 @@
 	- [4.4 useRef](#44-useref)
 	- [4.5 useImperativeHandle](#45-useimperativehandle)
 	- [4.6 useEffect](#46-useeffect)
-		- [4.6.1 useEffectEvent (экспериментальный)](#461-useeffectevent-экспериментальный)
+		- [4.6.1 Случаи неправильного использования useEffect](#461-случаи-неправильного-использования-useEffect)
 	- [4.7 useLayoutEffect](#47-uselayouteffect)
 	- [4.8 useInsertionEffect](#48-useinsertioneffect)
 	- [4.9 useMemo](#49-usememo)
-	- [4.10 React.memo](#410-reactmemo)
-	- [4.11 useCallback](#411-usecallback)
-	- [4.12 useDeferredValue](#412-usedeferredvalue)
-	- [4.13 useTransition](#413-usetransition)
-	- [4.14 useSyncExternalStore](#414-usesyncexternalstore)
-	- [4.15 use (экспериментальный)](#415-use-экспериментальный)
-		+ [4.15.1 Promise in use](#4151-promise-in-use)
-		+ [4.15.2 Context in use](#4152-context-in-use)
-	- [4.16 useId](#413-useid)
-	- [4.17 useOptimistic (экспериментальный)](#417-useoptimistic-экспериментальный)
-	- [4.18 useDebugValue](#418-usedebugvalue)
-	- [4.19 useActionState (экспериментальный)](#419-useactionstate-экспериментальный)
-	- [4.20 useFormStatus (экспериментальный)](#420-useformstatus-экспериментальный)
-	- [4.21 Кастомные хуки](#421-кастомные-хуки)
+		- [4.9.1 React.memo](#410-reactmemo)
+	- [4.10 useCallback](#411-usecallback)
+	- [4.11 useDeferredValue](#412-usedeferredvalue)
+	- [4.12 useTransition](#413-usetransition)
+	- [4.13 useSyncExternalStore](#414-usesyncexternalstore)
+	- [4.14 useId](#413-useid)
+	- [4.15 useOptimistic](#417-useoptimistic)
+	- [4.16 useDebugValue](#418-usedebugvalue)
+	- [4.17 useActionState](#419-useactionstate)
+	- [4.18 useFormStatus](#420-useformstatus)
+	- [4.19 Кастомные хуки](#421-кастомные-хуки)
 * [5. Пользовательские компоненты](#5-пользовательские-компоненты) 
 	- [5.1 Suspense](#51-suspense)
 		- [5.1.1 Lazy Loading](#511-lazy-loading)
@@ -980,6 +977,8 @@ function App() {
 ```
 
 При передаче ref в **функциональный** компонент, нужно обернуть этот компонент в `forwardRef`  
+>React 19 не требуется оборачивать компоненты в `forwardRef`  
+
 В *классовом компоненте* не требуется использовать `forwardRef`  
 ```typescript
 function App() {
@@ -1111,7 +1110,7 @@ const ChildComponent = forwardRef(({props, ref}:  ChildProps) => {
 ## 4.6 useEffect
 
 [В этот раз недостаточно подробно(видео)](https://www.youtube.com/watch?v=-4XpG5_Lj_o)  
-[Еще один(видео)](https://www.youtube.com/watch?v=0ZJgIjIuY7U)  
+[Еще одно(видео)](https://www.youtube.com/watch?v=0ZJgIjIuY7U)  
 
 `useEffect(callback, deps?)` - выполняет побочные эффекты при монтировании, размонтироваии и изменении состояния компонента
 * callback - функция (побочный эффект), выполняющаяся после рендера компонента
@@ -1153,29 +1152,353 @@ useEffect(() => {
 }, [human])
 ```
 
+[Перейти к useLayoytEffect](#47-uselayouteffect)
 [Вернуться к содержанию](#содержание)
 
-### 4.6.1 useEffectEvent (экспериментальный)
+### 4.6.1 Случаи неправильного использования useEffect
 
-[То же что в документации(видео)](https://www.youtube.com/watch?v=NZJUEzn10FI)  
+`useEffect` не стоит использовать в случаях:  
 
-`useEffectEvent(callback)` - разрывает реактивность `useEffect` от изменяющихся зависимостей, которые не должны приводить к ререндеру  
-На данный момент является экспериментальным хуком, поэтому требуется переключить `react: 'experimental'` в package.json  
+1. Обновление состояние на основе пропсов или другого состояния  
+
 ```typescript
-import { experimental_useEffectEvent as useEffectEvent } from 'react';
-function MyComponent ({url}) {
-	const {person} = useContext(PersonContent)
-	const age = person.age
-	{/* переменная age может изменяться, но не должна приводить к новому запуску useEffect и ререндеру */}
-	const onChange = useEffectEvent((changedUrl: string) => {
-		customFunction(changedUrl, age)
-	})
-	{/* оставляем реактивность url в зависимостях, чтобы useEffect реагировал на его изменение */}
+const [firstName, setFirstName] = useState('Petr');
+const [lastName, setLastName] = useState('Tchaikovsky');
+
+// 🔴 Лишние state и effect
+const [fullName, setFullName] = useState('');
+useEffect(() => {
+    setFullName(firstName + ' ' + lastName);
+}, [firstName, lastName]);
+
+// ✅ константа также перессчитывается при изменении состояний firstName и lastName
+const fullName = firstName + ' ' + lastName;
+```
+
+2. Кэширование ресурсоемких процессов  
+```typescript
+const TasksList = ({taksk, filter}) => {
+	const [newTask, setNewTask] = useState('');
+	
+	// 🔴 Лишние state и effect
+	const [filteredTasks, setFilteredTasks] = useState([]);
 	useEffect(() => {
-		onChange(url)
-	}, [url])
-} 
-``` 
+		setVisibleTodos(getFilteredTasks(tasks, filter));
+	}, [tasks, filter]);
+	
+	// ✅ Перенос вычислений в процесс рендера
+	const filteredTasks = useMemo(() => { return getFilteredTasks(tasks, filter) }, [tasks, filter]);
+	//...
+}
+```
+
+3. Сброс состояния при изменении пропсов  
+```typescript
+const ProfilePage = ({ userId }) => {
+  const [comment, setComment] = useState('');
+
+  // 🔴 Лишний effect
+  useEffect(() => {
+    setComment('');
+  }, [userId]);
+	
+}
+
+// ✅ Можно разнести компоненты и для каждого id рендерить свой компонент
+const ProfilePage = ({ userId }) => <Profile userId={userId} key={userId} />
+const Profile = ({ userId }) => {
+	const [comment, setComment] = useState('');
+	//...
+}
+```
+
+4. Изменение состояния при изменении пропсов  
+```typescript
+const List= ({ items }) => {
+	// 🔴 useEffect срабатывает после рендера, все дочерние компоненты получат старые значения
+	const [selection, setSelection] = useState(null);
+	useEffect(() => {
+    setSelection(null);
+  }, [items]);
+	
+	// ✅ Можно сохранить предыдущее состояние, но это вызывает лишний ререндер
+	const [prevItems, setPrevItems] = useState(items);
+  if (items !== prevItems) {
+    setPrevItems(items);
+    setSelection(null);
+  }
+	
+	// ✅ Отсутствие лишних ререндеров, вычисления происходят во время рендера
+	const [selectedId, setSelectedId] = useState(null);
+	const selection = items.find(item => item.id === selectedId) ?? null;
+}	
+```
+
+5. Общий код для обработчиков событий  
+```typescript
+// 🔴 Лишний effect
+useEffect(() => {
+	if (product.isDropped) {
+		showNotification();
+	}
+}, [product]);
+
+function handleBuyClick() {
+	addToCart(product);
+}
+
+function handleCheckoutClick() {
+	addToCart(product);
+	navigateTo('/checkout');
+}
+
+// ✅ Можно вынести логику в общую функцию и переиспользовать ее в хэндлерах
+function buyProduct() {
+	addToCart(product);
+	if (product.isDropped) showNotification();
+}
+
+function handleBuyClick() {
+	buyProduct();
+}
+
+function handleCheckoutClick() {
+	buyProduct();
+	navigateTo('/checkout');
+}
+```
+
+6. POST-запросы  
+```typescript
+// 🔴 Лишний ререндер при пользовательском взаимодействии
+const [jsonToSubmit, setJsonToSubmit] = useState(null);
+useEffect(() => {
+	if (jsonToSubmit !== null) {
+		post('/api/register', jsonToSubmit);
+	}
+}, [jsonToSubmit]);
+function handleSubmit(e) {
+	e.preventDefault();
+	setJsonToSubmit({ firstName, lastName });
+}
+
+// ✅ Можно вынести POST-запрос в event handler
+function handleSubmit(e) {
+	e.preventDefault();
+	post('/api/register', { firstName, lastName });
+}
+```
+
+7. Цепочки useEffect  
+```typescript
+const [card, setCard] = useState(null);
+const [round, setRound] = useState(1);
+
+// 🔴 Цепочки эффектов триггерят несколько ререндеров подряд
+const [isGameOver, setIsGameOver] = useState(false);
+useEffect(() => {
+	if (card !== null) {
+		setRound(prev => prev + 1)
+	}
+}, [card]);
+useEffect(() => {
+	if (round > 5) {
+		setIsGameOver(true);
+	}
+}, [round]);
+
+useEffect(() => {
+	alert('Good game!');
+}, [isGameOver]);
+
+function handlePlaceCard(nextCard) {
+	if (isGameOver) {
+		throw Error('Game already ended.');
+	} else {
+		setCard(nextCard);
+	}
+}
+
+
+// ✅ Нужно перенести логику вычисления в процесс рендера или внутрь обработчика
+const isGameOver = round > 5;
+
+function handlePlaceCard(nextCard) {
+	if (isGameOver) {
+		throw Error('Game already ended.');
+	} else {
+		setCard(nextCard);
+		setRound(round + 1);
+		if (round === 5) {
+			alert('Good game!');
+		}
+	}
+}
+```
+
+8. Инициализация приложения  
+```typescript
+// 🔴 Нужно избегать effecta с логикой, которая должна выполняться только 1 раз
+useEffect(() => {
+	loadDataFromLocalStorage();
+	checkAuthToken();
+}, []);
+
+// ✅ Для большей устойчивости к повторному маунту можно завести флаг начальной загрузки
+let didInit = false;
+
+function App() {
+	useEffect(() => {
+		if (!didInit) {
+			didInit = true;
+			
+			loadDataFromLocalStorage();
+			checkAuthToken();		
+		}
+	}, []);
+}
+
+// ✅ Или вынести логику вне компонента
+if (typeof window !== 'undefined') {
+  checkAuthToken();
+  loadDataFromLocalStorage();
+}
+function App() {
+  // ...
+}
+```
+
+9. Уведомление родительского компонента об изменении состояния  
+```typescript
+const Toggle = ({ onChange }) => {
+	const [isOn, setIsOn] = useState(false);
+
+	// 🔴 Хэндлер запускается слишком поздно
+	useEffect(() => {
+			onChange(isOn);
+	}, [isOn, onChange])
+
+	function handleClick() {
+		setIsOn(!isOn);
+	}
+
+	// ✅ Вынести обновление стейтов в обработчик события
+	function updateToggle(nextIsOn) {
+		setIsOn(nextIsOn);
+		onChange(nextIsOn);
+	}
+	function handleClick() {
+		updateToggle(!isOn);
+	}
+
+	// ✅ Сделать управляемый компонент, убрав внутреннее состояние (в примере: isOn) в родительский компонент и передавать его как пропс
+	function handleClick() {
+    onChange(!isOn);
+  }
+
+  //...
+}
+```
+
+10. Передача данных родителю  
+```typescript
+
+// 🔴 Нарушение принципа однонаправленного потока данных
+function Parent() {
+  const [data, setData] = useState(null);
+  // ...
+  return <Child onFetched={setData} />;
+}
+
+function Child({ onFetched }) {
+  const data = useAPI();
+  useEffect(() => {
+    if (data) {
+      onFetched(data);
+    }
+  }, [onFetched, data]);
+  // ...
+}
+
+// ✅ Данные должны передаваться сверху вниз от родителя к дочерним компонентам
+function Parent() {
+  const data = useAPI();
+  // ...
+  return <Child data={data} />;
+}
+
+function Child({ data }) {
+  // ...
+}
+```
+
+11. Подписка на внешний store  
+```typescript
+// 🔴 Требуется ручное управление синхронизацией с состоянием
+const [isOnline, setIsOnline] = useState(true);
+useEffect(() => {
+	function updateState() {
+		setIsOnline(navigator.onLine);
+	}
+
+	updateState();
+
+	window.addEventListener('online', updateState);
+	window.addEventListener('offline', updateState);
+	return () => {
+		window.removeEventListener('online', updateState);
+		window.removeEventListener('offline', updateState);
+	};
+}, []);
+
+// ✅ Использование хука useSyncExternalStore
+function subscribe(callback) {
+  window.addEventListener('online', callback);
+  window.addEventListener('offline', callback);
+  return () => {
+    window.removeEventListener('online', callback);
+    window.removeEventListener('offline', callback);
+  };
+}
+
+function useOnlineStatus() {
+	 return useSyncExternalStore(
+		subscribe,
+		() => navigator.onLine,
+		() => true
+	) 
+}
+```
+
+12. Получение данных
+Один из случаев оправданного применения `useEffect`.
+```typescript
+const [results, setResults] = useState([]);
+const [page, setPage] = useState(1);
+// 🔴 Проблема race condition
+useEffect(() => {
+	// query может изменяться при прямом переходе с заданным query, браузерной навигации, нажатии на предусмотренные в коде кнопки 
+	fetchResults(query, page).then(json => {
+		setResults(json);
+	});
+}, [query, page]);
+	
+// ✅ Отмена устаревших данных в cleanup
+useEffect(() => {
+	let ignore = false;
+	fetchResults(query, page).then(json => {
+		if (!ignore) {
+			setResults(json);
+		}
+	});
+	return () => {
+		ignore = true;
+	};
+}, [query, page]);
+```
+
+[Статья из документации](https://react.dev/learn/you-might-not-need-an-effect)   
+
 [Вернуться к содержанию](#содержание)
 
 ## 4.7 useLayoutEffect
@@ -1238,9 +1561,9 @@ console.timeEnd('end');
 
 [Вернуться к содержанию](#содержание)
 
-## 4.10 React.memo
+##№ 4.9.1 React.memo
 
-`React.memo(component[, fn])` - мемоизирует компонент
+`React.memo(component[, fn])` - мемоизирует компонент. _Не является хуком_
 * component - компонент для мемоизации  
 * fn - функция сравнения пропсов, передаваемых в component, для принятия решения о ререндере  
 Применяется, когда дочерние компоненты не изменяются при изменении состояния родителя (дочерний компонент не будет повторно отрендерен)  
@@ -1271,7 +1594,7 @@ class Header extends Component<Props, State> {
 ```
 [Вернуться к содержанию](#содержание)
 
-## 4.11 useCallback
+## 4.10 useCallback
 
 [Качественный разбор(видео)](https://www.youtube.com/watch?v=MxIPQZ64x0I)  
 [Еще один(видео)](https://www.youtube.com/watch?v=_AyFP5s69N4)  
@@ -1281,7 +1604,7 @@ class Header extends Component<Props, State> {
 >Возвращает функцию, НЕ вызвает ее.  
 * deps - зависимости в формате [dep1, dep2, dep3]  
 
-Используется в связке с `memo`  
+>Используется в связке с `memo`  
 При передаче в `memo` функций НЕ обернутых в `useCallback` мемоизация компонента не имеет смысла, т.к. функия - ссылочный тип  
 
 ```typescript
@@ -1368,7 +1691,7 @@ useEffect(() => {
 
 [Вернуться к содержанию](#содержание)
 
-## 4.12 useDeferredValue
+## 4.11 useDeferredValue
 
 [хороший разбор(видео)](https://www.youtube.com/watch?v=yIpHTYo3PY0)  
 [еще один(видео)](https://www.youtube.com/watch?v=jCGMedd6IWA)  
@@ -1409,7 +1732,7 @@ const ChildComponent = memo(({text}: TChildProps) => {
 
 [Вернуться к содержанию](#содержание)
 
-## 4.13 useTransition
+## 4.12 useTransition
 
 [Детальный разбор(видео)](https://www.youtube.com/watch?v=1xjSQJWejZM)  
 [Еще один(видео)](https://www.youtube.com/watch?v=N5R6NL3UE7I)  
@@ -1468,7 +1791,7 @@ console.log(3);
 
 [Вернуться к содержанию](#содержание)
 
-## 4.14 useSyncExternalStore
+## 4.13 useSyncExternalStore
 
 [Отличные примеры применения](https://www.youtube.com/watch?v=Y34aQue4DIg)  
 
@@ -1501,83 +1824,7 @@ const UseSyncExample = () => {
 
 [Вернуться к содержанию](#содержание)
 
-## 4.15 use (экспериментальный)
-
-[Отличный ролик](https://www.youtube.com/watch?v=zdNF9FJWJ8o)  
-
-`use(Promise_or_Context)` - **экспериментальная** хук, позволяющий прочитать значение Promise или Context  
-Отличие от остальных хуков: `use` **можно использовать внутри Циклов или Условий**  
-Как и остальные хуки, `use` должен использоваться внутри другого компонента или кастомного хука  
-
-### 4.15.1 Promise in use
-
-В серверном компоненте отдается предпочтение `async/await` вместо `use`, т.к. `async/await` рендерит с того момента как вызван `await`, а `use` повторно рендерит компонент после разрешения Promise
-При использовании Promise, `use` комбинируется с `<Suspense />` и `<ErrorBoundary>`
-Вместо ErrorBoundary альтернативно можно воспользоваться `catch` в Promise, значение которого также возвращается из `use` 
-```typescript
-// ParentComponent
-const ParentComponent = () => {
-	const fetchFromServer = fetch(url).then(res => res.json())
-	return (
-		<ErrorBoundary fallback={<div>Error</div>}>
-			<Suspense fallback={<div>Loading...</div>}>
-				<MyComponent request={fetchFromServer}>
-			</Suspense>
-		</ErrorBoundary>
-	)
-}
-
-// ChildComponent.tsx
-const ChildComponent = () => {
-	// ответ с Promise должен быть сериализуем! Объект или Массив. Функции НЕ сериализуемы
-	const data = use(request)
-	return <p>{data}</p>
-}
-
-// ErrorBoundary.tsx
-type ErrorBoundaryProps =  {
-  fallback: ReactNode;
-  children: ReactNode;
-}
-type ErrorBoundaryState = {
-  hasError: boolean;
-  error: Error | null;
-}
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState  = {hasError: false, error: null}
-	static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-		return {
-			hasError: true,
-			error
-		}
-	}
-	
-	render() {
-		if(this.state.hasError) {
-			return this.props.fallback
-		}
-		return this.props.children
-	}
-}
-```
-Вызов `use` приостанавливает компонент на время выполнения Promise. Пока не завершится Promise отображается fallback `<Suspense />`  
-`<ErrorBoundary />` перехватывает возникшие ошибки.  
-
-### 4.15.2 Context in use
-
-`use(myContext)` аналог `useContext(myContext)`, но его можно использовать внутри условий/циклов  
-`use` - ищет ближайший родительский `<Provider />`, не рассматривая провайдеров контекста в самом компоненте  
-
-```typescript
-if(isEnabled) {
-	const data = use(myContext)
-	return <p>{data}<p>
-}
-```
-
-[Вернуться к содержанию](#содержание)
-
-## 4.16 useId
+## 4.14 useId
 
 [Разбор темы(видео)](https://www.youtube.com/watch?v=_vwCKV7f_eA)  
 [Более подробный разбор(видео)](https://www.youtube.com/watch?v=GNVI9Pr_RKQ&t=777s)  
@@ -1591,7 +1838,7 @@ if(isEnabled) {
 
 [Вернуться к содержанию](#содержание)
 
-## 4.17 useOptimistic (экспериментальный)
+## 4.15 useOptimistic
 
 [Пример с обработкой ошибки(видео)](https://www.youtube.com/watch?v=PPOw-sDeoNw)  
 [Пример без обработки ошибки(видео)](https://www.youtube.com/watch?v=M3mGY0pgFk0)  
@@ -1645,7 +1892,7 @@ function MyComponent({ messages, sendMessage }: TMyComponentProps) {
 
 [Вернуться к содержанию](#содержание)
 
-## 4.18 useDebugValue
+## 4.16 useDebugValue
 
 [хороший разбор(видео)](https://www.youtube.com/watch?v=pTF86K8JZBQ)  
 
@@ -1658,11 +1905,11 @@ function MyComponent({ messages, sendMessage }: TMyComponentProps) {
 
 [Вернуться к содержанию](#содержание)
 
-## 4.19 useActionState (экспериментальный)  
+## 4.17 useActionState
 
 [Самая актуальная инфа в доке](https://react.dev/reference/react/useActionState)  
 
-`const [state, formAction] = useActionState(fn, initialState, permalink?)` - хук, который позволяет обновлять состояние на основе результата действия формы, где  
+`const [state, formAction, isPending] = useActionState(fn, initialState, permalink?)` - хук, который позволяет обновлять состояние на основе результата действия формы, где  
 * `fn(previousState, formData)` - асинхронная функция вызываемая при отправке формы или нажатии кнопки  
 	* `previousState` - предыдущее состояние формы (изначально `initialState`)
 	* `formData` - аргументы формы
@@ -1670,22 +1917,23 @@ function MyComponent({ messages, sendMessage }: TMyComponentProps) {
 * `permalink` - уникальный URL страницы, испольуемый формой, для редиректа на другую страницу после отправки формы  
 При отправке формы (до загрузки JS бандла) произойдет редирект на `permalink`
 * `state` - текущее состояние (во время первого рендера соответствует `initialState`)
-* `formAction` - действие передаваемое в компоненты формы  
+* `formAction` - `action` передаваемый в компоненты формы или пропс `formAction` любой кнопки внутри формы, также может быть вызвано вручную внутри `startTransition`
+* `isPending` - флаг состояния Transition (перехода)
 
 ```typescript
 import { action  } from "./actions.js";
 const Index = () => {
-	const [state, formAction] = useActionState(action, null)
+	const [state, formAction, isPending] = useActionState(action, null)
   return (
     <form action={formAction}>
-			{state}
 			<button type="submit">Submit</button>
+			{isPending ? "Loading..." : state}
 		</form>
 	);
 }
 ```
 
-## 4.20 useFormStatus (экспериментальный)
+## 4.18 useFormStatus
 
 `const { pending, data, method, action } = useFormStatus()` - хук `react-dom`, предоставляет информацию о статусе последней отправки родительской формы, где  
 * `pending` - boolean. True - форма в процессе отправки
@@ -1721,7 +1969,7 @@ const Submit = () => {
 
 [Вернуться к содержанию](#содержание)  
 
-## 4.21 Кастомные хуки
+## 4.19 Кастомные хуки
 
 Кастомные хуки - начинаются с use и используют внутри базовые хуки    
 Кастомные, также как и встроенные хуки не должны использоваться внутри условных конструкций, циклов и других функциях  
