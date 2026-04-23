@@ -21,23 +21,28 @@
 	- [4.7 useLayoutEffect](#47-uselayouteffect)
 	- [4.8 useInsertionEffect](#48-useinsertioneffect)
 	- [4.9 useMemo](#49-usememo)
-		- [4.9.1 React.memo](#410-reactmemo)
-	- [4.10 useCallback](#411-usecallback)
-	- [4.11 useDeferredValue](#412-usedeferredvalue)
-	- [4.12 useTransition](#413-usetransition)
-	- [4.13 useSyncExternalStore](#414-usesyncexternalstore)
-	- [4.14 useId](#413-useid)
-	- [4.15 useOptimistic](#417-useoptimistic)
-	- [4.16 useDebugValue](#418-usedebugvalue)
-	- [4.17 useActionState](#419-useactionstate)
-	- [4.18 useFormStatus](#420-useformstatus)
-	- [4.19 Кастомные хуки](#421-кастомные-хуки)
+		- [4.9.1 React.memo](#491-reactmemo)
+	- [4.10 useCallback](#410-usecallback)
+	- [4.11 useDeferredValue](#411-usedeferredvalue)
+	- [4.12 useTransition](#412-usetransition)
+	- [4.13 useSyncExternalStore](#413-usesyncexternalstore)
+	- [4.14 useId](#414-useid)
+	- [4.15 useOptimistic](#415-useoptimistic)
+	- [4.16 useDebugValue](#416-usedebugvalue)
+	- [4.17 useActionState](#417-useactionstate)
+	- [4.18 useFormStatus](#418-useformstatus)
+	- [4.19 useEffectEvent](#419-useeffectevent)
+	- [4.20 Кастомные хуки](#420-кастомные-хуки)
 * [5. Пользовательские компоненты](#5-пользовательские-компоненты) 
 	- [5.1 Suspense](#51-suspense)
 		- [5.1.1 Lazy Loading](#511-lazy-loading)
 	- [5.2 Error Boundary](#52-error-boundary)
 	- [5.3 HOC (High Order Component)](#53-hoc-high-order-component)
 	- [5.4 Compound component](#54-compound-component)
+	- [5.5 Activity](#55-activity)
+	- [5.6 ViewTransition](#56-viewtransition)
+	- [5.7 Container Presenter](#57-container-presenter-component)
+	- [5.8 Render Props](#58-render-props)
 * [6. ReactDOM. Элементы и события React](#6-reactdom-элементы-и-события-react) 
 * [7. Portals](#7-portals) 
 * [8. Переменные окружения в React](#8-переменные-окружения-в-react) 
@@ -90,17 +95,19 @@ _Термин Virtual DOM устаревшее понятие._
 RE может пересоздаваться, а Fiber мутирует,сохраняя новые данные о нем. Fiber сохраняет связь с RE на всем жизненном цикле, при размонтировании компонента Fiber уничтожается.  
 Для обхода дерева и поиска изменений используются алгоритмы со сложностью `O(N^3)`, что неоптимально. В React используется эвристический подход, что снижает сложность до `O(N)`  
 Эвристика (Diffing Algorithm): 
-1. разные типы элементов (`span => div`) относятся к разным деревьям (изменении позиции элементов приводит к ререндеру) 
-2. состояние компонента сохраняется, пока React видит тот же компонент на той же позиции в дереве
+1. разные типы элементов (`span => div`) относятся к разным деревьям (изменении позиции элементов приводит к ререндеру).  
+Состояние компонента сохраняется, пока React видит тот же компонент на той же позиции в дереве
 3. ключи (`key`) помогают React сопоставлять элементы между ререндерами и избегать лишнего перемонтирования, если сам компонент не изменился, а изменился только его порядок
 ```typescript
 // компонент находится на разных позициях, поэтому он перемонтируется, запуская все собственные эффекты заново
 function Parent(isVisible: boolean) {
 	if(isVisible) {
-		return <>
+		return (
+          <>
 			<OptionalComponent />
 			<ChildComponent />
-		</>
+		  </>
+		)
 	}
 	return <ChildComponent />
 }
@@ -109,11 +116,13 @@ function Parent(isVisible: boolean) {
 ```typescript
 function Parent(isVisible: boolean) {
 	if(isVisible) {
-		return <>
+		return (
+          <>
 			<OptionalComponent />
 			// key помогает React сопоставить компонент между рендерами
 			<ChildComponent key='uniqueKey' />
-		</>
+		  </>
+		)
 	}
 	// позиция компонента изменилась со 2 на 1
 	return <ChildComponent key='uniqueKey' />
@@ -150,17 +159,16 @@ _Приоритезация эффектов:_
 1. Mutation - внесение изменений в реальный DOM на основе различий, найденных в фазу рендеринга
 2. Layout - выполняются useLayoutEffect, componentDidMount, componentDidUpdate
 
-**Concurrency** в разрезе reconciliation: 
+**Concurrency** в разрезе reconciliation:  
 Прервать выполнение можно только в Render Phase. Высокоприоритетная задача, приостанавливает текущую работу.  
 При этом уже собранные эффекты остаются в Effect List, WorkInProgress Tree остается частично завершенным.  
-После обработки приоритетной задачи React может продолжить прерванный рендерингг, а если состояние успели измениться, то Render Phase может начаться заново. 
+После обработки приоритетной задачи React может продолжить прерванный рендерингг, а если состояние успело измениться, то Render Phase может начаться заново. 
 
-**Concurrency** - конкурентный режим в общем смысле. Возможность React прерывать менее приоритетный рендер более приоритетной задачей.  
-Возможность прервать низкоприоритетную задачу более высокоприоритетной задачей, при этом состояние переданное в низкоприоритетную задачу сбрасывается до предыдущего. 
-К низкоприоритетным задачам относятнся: useTransition, startTransition, useDefferedValue, к высокоприоритетным: useState, useReducer, useSyncExternalState.
+**Concurrency** -  Возможность прервать низкоприоритетную задачу более высокоприоритетной задачей, при этом состояние переданное в низкоприоритетную задачу сбрасывается до предыдущего.  
+К низкоприоритетным задачам относятнся: `useTransition, startTransition, useDefferedValue`, к высокоприоритетным: `useState, useReducer, useSyncExternalState`.  
 [Более подробно про Concurrency](https://www.youtube.com/watch?v=M1OBMTYsKpo)
 
-**SSR**
+**SSR**  
 [Про SSR и его преимущества](https://www.youtube.com/watch?v=pj5N-Khihgc)
 
 [Вернуться к содержанию](#содержание)
@@ -169,7 +177,9 @@ _Приоритезация эффектов:_
 
 ## 1.1 Общее
 
-Сниппеты webStorm: 
+<details>
+<summary>Сниппеты webStorm</summary>
+
 * rsi - функциональный компонент - стрелочная функция без return
 * rsf - функциональный компонент
 * rsc - функциональный компонент - стрелочная функция
@@ -178,6 +188,7 @@ _Приоритезация эффектов:_
 * rcc - классовый компонент
 * rccp - классовый компонент с PropType
 * rcfc- классовый компонент с PropType и методами жизненного цикла
+</details>	
 
 Компоненты пишутся с большой буквы и возвращают JSX-код.  
 С 17 версии нет необходимости импортировать `React from 'react'`, т.к. JSX Transform автоматически проставляет импорты для JSX кода   
@@ -216,8 +227,7 @@ JSX - расширение синтаксиса JS, представляющее
 Изменяться могут только данные, созданные внутри компонента.  
 Компонент должен возвращать **одинаковый результат** при вызове с тем же набором аргументов, иначе это приведет ошибкам  
 Любые сайд-эффекты нужно выносить в обработчики событий, useEffect и т.д.  
-`<StrictMode></StrictMode>` - стресс-тест, запускающийся только в dev-режиме  
-Вызывает дополнительный цикл `setup+cleanup` для поиска ошибок "нечистого" рендеринга  
+`<StrictMode></StrictMode>` - стресс-тест, запускающийся только в dev-режиме, который вызывает дополнительный цикл `setup+cleanup` для поиска ошибок "нечистого" рендеринга.  
 Цикл `setup->cleanup->setup` в dev-режиме должен соответствовать `setup` в prod-режиме  
 
 При использовании условных конструкций `(condition) && (statement)`, `condition` **должен возвращать boolean** значение  
@@ -383,7 +393,7 @@ const ParentComponent = ({children, ...props}: ParentComponentProps) => {
 ```
 
 Пропсы передаются сверху вниз (от родительского компонента к дочернему). Для передачи данных в обратном направлении нужно передать **функцию обратного вызова** в дочерний компонент  
-**Важно** передавать функцию `{myFunc}`, а не ее вызов `{myFunc()}` _(неправильный вариант)_
+**Важно** передавать функцию `{myFunc}`, а не ее вызов `{myFunc()}` - _(неправильный вариант)_
 ```typescript
 function App() {
 	const myFunc = () => {...логика...}
@@ -480,9 +490,10 @@ setArray([...array, {id: 3}])
 * state - текущее состояние
 * setState - функция сеттер для изменения состояния
 * defaultValue - начальное значение состояния (можно использовать функцию)  
-`const [state, setState] = useState(() => setInitial())` - выполнится только при первом рендере  
-`const [state, setState] = useState(setInitial())` - выполнится при **КАЖДОМ** новом рендере  
->При передаче больших объемов данных, например массива `useState([0, 1, ..., 999999])`, он будет пересоздаваться при **каждом** ререндере, что приводит к повторным вычислениям, поэтому оправдано использование функции, т.к. она вызывается лишь единожды 
+>Если начальное значение `useState` вычисляется дорого, например создается большой массив `useState([0, 1, ..., 999999])`, лучше передавать функцию-инициализатор:
+>  * `useState(() => createInitialState())` - функция будет вызвана только при первом рендере
+>  * `useState(createInitialState())` - `createInitialState()` будет вычисляться при каждом ререндере компонента  
+>Это не переинициализирует state на каждом ререндере, но создает лишние вычисления.
 
 Напрямую изменять (mutate) состояние нельзя, поэтому любые *мутирующие* методы (sort, reverse и т.д.) должны вызываться на копии  
 [Проверка методов на мутации](https://doesitmutate.xyz/)  
@@ -676,6 +687,18 @@ handleClick() {
 * Дублирование объекта в state - решение: можно хранить только значимое поле вместо всего объекта, например id
 * Большая вложенность в state - решение: можно нормализовать вложенность (сделать плоским объектом)  
 
+>Плохой паттерн: `setState` внутри updater function другого `setState`  
+>updater function в React должна быть pure: она должна только вычислить и вернуть новое состояние.  
+> [Пруф](https://react.dev/learn/queueing-a-series-of-state-updates#what-happens-if-you-replace-state-after-updating-it)
+
+```jsx
+setA(prevA => {
+setB(prevB => prevB + 1);
+return prevA + 1;
+});
+```
+ 
+
 [Вернуться к содержанию](#содержание)
 
 ## 4.2 useReducer
@@ -787,7 +810,7 @@ function reducerFunction(draft, action) {
 Используется: 
 * при передача props более чем на 2 уровня вложенности компонентов, для исключения проблемы Props Drilling  
 * для редко изменяемых данных (тема, язык), т.к. 
-Для часто меняющихся данных используются библиотеки с глобальным хранилищем: Redux и т.д.    
+Для часто меняющихся данных используются библиотеки с глобальным хранилищем: Redux, Zustand и т.д.    
 ```typescript
 // Context.ts
 type StateType = string
@@ -1280,6 +1303,7 @@ useEffect(() => {
 		post('/api/register', jsonToSubmit);
 	}
 }, [jsonToSubmit]);
+
 function handleSubmit(e) {
 	e.preventDefault();
 	setJsonToSubmit({ firstName, lastName });
@@ -1304,6 +1328,7 @@ useEffect(() => {
 		setRound(prev => prev + 1)
 	}
 }, [card]);
+
 useEffect(() => {
 	if (round > 5) {
 		setIsGameOver(true);
@@ -1366,6 +1391,7 @@ if (typeof window !== 'undefined') {
   checkAuthToken();
   loadDataFromLocalStorage();
 }
+
 function App() {
   // ...
 }
@@ -1550,7 +1576,7 @@ useLayoutEffect(() => {
 * deps - зависимости в формате [dep1, dep2, dep3], изменение которых ведет к новому вычислению calculateValue   
 
 `useMemo` стоит применять, когда вычисления занимают длительное время. 
-Также при передаче объекта/массива как props их нужно мемоизировать (т.к. `{} !== {}`). Ссылка на них сохранится - не будет лишних ререндеров
+Также при передаче объекта/массива как props их нужно мемоизировать (т.к. `{} !== {}`). Ссылка на них сохранится - не будет лишних ререндеров  
 Мемоизация объекта: `useMemo(() => ({name: 'Petr'}), [])`  
 >При мемоизации функции сохраняется **результат** ее вычислений  
 
@@ -1564,7 +1590,7 @@ console.timeEnd('end');
 
 [Вернуться к содержанию](#содержание)
 
-##№ 4.9.1 React.memo
+### 4.9.1 React.memo
 
 `React.memo(component[, fn])` - мемоизирует компонент. _Не является хуком_
 * component - компонент для мемоизации  
@@ -1851,6 +1877,7 @@ const UseSyncExample = () => {
 * addOptimistic(optimisticValue) - функция вызывающая `updateFn(state, optimisticValue)`
 	* state - состояние, которое возвращается изначально и когда никаких действий не ожидается
 	* updateFn(currentState, optimisticValue) - чистая функция (аргументы: текущее и оптимистичное состояние), которая возвращает результат вычислений как оптимистическое состояние
+
 ```typescript
 import {useOptimistic} from 'react'
 function MyComponent({ messages, sendMessage }: TMyComponentProps) {
@@ -1890,8 +1917,8 @@ function MyComponent({ messages, sendMessage }: TMyComponentProps) {
 			</form>
 		</>
 	)
-}
-```	
+};
+```
 
 [Вернуться к содержанию](#содержание)
 
@@ -1972,7 +1999,21 @@ const Submit = () => {
 
 [Вернуться к содержанию](#содержание)  
 
-## 4.19 Кастомные хуки
+## 4.19 useEffectEvent
+
+`const onEvent = useEffectEvent(callback)` - хук, позволяющий вынести из `useEffect` нереактивную логику, которая должна читать актуальные props/state, но не должна вызывать повторный запуск effect, где
+* `callback` - логика EffectEvent  
+
+> Не стоит злоупотреблять хуком, как способом убрать "лишние" зависимости из effect-ов. Нужно использовать осмысленно, где это действительно необходимо  
+
+Effect Event (возвращаемое значение хука):  
+* можно вызывать только внутри `useEffect`, `useLayoutEffect`, `useInsertionEffect` или других Effect Event  
+* нельзя вызывать во время рендера
+* не рекомендуется передавать в другие компоненты или кастомные хуки  
+
+[Вернуться к содержанию](#содержание)
+
+## 4.20 Кастомные хуки
 
 Кастомные хуки - начинаются с use и используют внутри базовые хуки    
 Кастомные, также как и встроенные хуки не должны использоваться внутри условных конструкций, циклов и других функциях  
@@ -2262,6 +2303,204 @@ UserCard.Footer = function UserCardFooter() {
 [Видео-пример компонента](https://www.youtube.com/watch?v=N_WgBU3S9W8)
 
 [Вернуться к содержанию](#содержание)  
+
+## 5.5 Activity
+
+`<Activity mode>{children}</Activity>` - механизм скрытия части UI с сохранением состояния и пониженным приоритетом обновлений, где  
+* `mode` - режим показа/скрытия: `visible` (по умолчанию) / `hidden`  
+
+При скрытии к дочернему компоненту применяется `display: none`, срабатывает cleanup эффектов, но компоненты продолжают ререндериться с низким приоритетом при изменении пропсов  
+Когда компонент становится видимым он восстанавливает свое предыдущее состояние и заново монтирует эффекты  
+Если `Activity` используется внутри `ViewTransition`, то при скрытии срабатывает exit-анимация, при появлении - start-анимация  
+Если дочерний компонент содержит только текст, то при скрытии он не рендерится  
+
+В отличии от условного рендера `{isShowingSidebar && <Modal />}` дочерний компонент:  
+* не инициализирует заново свой `state`  
+* не теряет введенный текст (на примере `textarea`)  
+* заранее рендерит скрытые компоненты, без срабатывания onMount эффектов в режиме скрытия
+
+```jsx
+<Activity mode={isShow ? "visible" : "hidden"}>
+  <>
+	<Modal />
+	<textarea />
+	<SlowComponent />
+  </>	
+</Activity>
+```
+
+Проблемы с `<video>, <audio>, <iframe>`:  
+Компоненты не имеют собственного cleanup и будут продолжать проигрываться в фоне при скрытии.  
+Для решения проблемы стоит явно добавить cleranup с паузой воспроизведения  
+
+```jsx
+export default function Video() {
+	const ref = useRef();
+	// используем useLayoutEffect, чтобы избежать задержки при использовании Suspense или ViewTransition
+	useLayoutEffect(() => {
+		const videoRef = ref.current;
+
+		return () => {
+			videoRef.pause()
+		}
+	}, []);
+
+	return <video ref={ref} src="..."/>
+}
+```
+
+[Вернуться к содержанию](#содержание)
+
+## 5.6 ViewTransition
+
+`<ViewTransition>{children}</ViewTransition>` - компонент React для анимированных переходов (transition) между состояниями интерфейса. По умолчанию анимация crossfade. _(пока еще в Canary)_    
+* `name` - опциональный пропс (string/object) для именования transition. По умолчанию React генерирует для каждого transition уникальное имя  
+* `enter`, `exit`, `update`, `share`, `default` - transition при появлении, скрытии, изменении, общий transition между связанными элементами. Значения: `auto` (по умолчанию), `none` - отсутствие transition данного типа, `<classname>` - кастомный CSS класс (string/object)  
+`default='none'` - отключает все, не заданные явно, transition
+*  `onEnter(instance, types) => {}`, `onExit(instance, types) => {}`, `onShare(instance, types) => {}`, `onUpdate(instance, types) => {}` - event срабатывающий при вызове соответствующего transition, где  
+	* `types` - [массив типов анимаций](https://www.w3.org/TR/css-view-transitions-2/#active-view-transition-pseudo-examples)
+    * `instance` - объект для доступа к псевдоэлементам transition: `old, new, name, group, imagePair`
+
+```jsx
+<ViewTransition
+	name="modal"
+	enter="fade-in"
+	exit="fade-out"
+	update="smooth"
+	share="morph"
+>
+	{isOpen ? <Modal /> : null}
+</ViewTransition>
+```
+
+Позволяет:
+* анимировать появление и скрытие элементов
+* анимировать изменение layout
+* анимировать переход между fallback и готовым контентом (`Suspense` и `Activity`)
+* использовать переходы между связанными элементами через name
+* применять разные анимации для разных типов переходов  
+
+>Срабатывает только при размещении ДО других DOM элементов
+```jsx
+//Верно
+<ViewTransition>
+	<div/>
+</ViewTransition>
+//Неверно
+<div>
+	<ViewTransition>
+		<div/>
+	</ViewTransition>
+</div>
+```
+
+[Подробнее в документации](https://react.dev/reference/react/ViewTransition)  
+
+[Вернуться к содержанию](#содержание)
+
+## 5.7 Container Presenter component
+
+**Container / Presenter component** - паттерн разделения логики и отображения.  
+`Container` отвечает за получение данных, состояние и обработчики, а `Presenter` только за отображение через props.  
+
+Паттерн полезен, когда нужно:  
+* отделить UI от data fetching и business logic  
+* переиспользовать чистый UI-компонент отдельно от логики    
+
+**Задача:** Нужно отобразить список пользователей. Логику получения данных и состояние загрузки не хочется смешивать с JSX-разметкой списка.  
+
+```typescript
+type TUser = {
+	id: number;
+	name: string;
+	email: string;
+}
+
+type UserListProps = {
+	users: TUser[];
+	isLoading: boolean;
+}
+
+// Presenter component
+const UserList = ({ users, isLoading }: UserListProps) => {
+	if (isLoading) return <p>Loading...</p>;
+	if (!users.length) return <p>No users</p>;
+
+	return (
+		<ul>
+			{users.map((user) => (
+				<li key={user.id}>
+					<strong>{user.name}</strong> - {user.email}
+				</li>
+			))}
+		</ul>
+	);
+};
+
+// Container component
+const UserListContainer = () => {
+	const [users, setUsers] = useState<TUser[]>([]);
+	const [isLoading, setIsLoading] = useState(true);
+
+	useEffect(() => {
+		async function loadUsers() {
+			const response = await fetch('/api/users');
+			const data = await response.json();
+			setUsers(data);
+			setIsLoading(false);
+		}
+
+		loadUsers();
+	}, []);
+
+	return <UserList users={users} isLoading={isLoading} />;
+};
+```
+
+[Вернуться к содержанию](#содержание)
+
+## 5.8 Render Props
+
+**Render Props** - паттерн, при котором компонент принимает функцию и через нее передает наружу данные или поведение.  
+Это позволяет переиспользовать логику, не привязываясь к конкретной разметке.
+
+**Задача:** Нужно переиспользовать логику отслеживания позиции курсора, но отображать результат в разных компонентах по-разному.  
+
+```typescript
+type MousePosition = {
+	x: number;
+	y: number;
+}
+
+type MouseTrackerProps = {
+	render: (position: MousePosition) => React.ReactNode;
+}
+
+const MouseTracker = ({ render }: MouseTrackerProps) => {
+	const [position, setPosition] = useState<MousePosition>({ x: 0, y: 0 });
+
+	useEffect(() => {
+		function handleMouseMove(event: MouseEvent) {
+			setPosition({
+				x: event.clientX,
+				y: event.clientY,
+			});
+		}
+
+		window.addEventListener('mousemove', handleMouseMove);
+		return () => window.removeEventListener('mousemove', handleMouseMove);
+	}, []);
+
+	return <>{render(position)}</>;
+};
+
+<MouseTracker render={({ x, y }) => (
+	<p>Mouse position: {x}, {y}</p>
+  )}
+/>
+```
+
+[Вернуться к содержанию](#содержание)
 
 # 6. ReactDOM. Элементы и события React
 
