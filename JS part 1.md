@@ -2321,7 +2321,26 @@ obj.name = 'Olga'
 import {obj} from './module1.js'
 console.log(obj) // {name: 'Olga'}
 ```
-Решение проблемы - создание фабрики для генерации однотипных объектов: `export function createObj() { return {name: 'Petr'} }`
+Решение проблемы - создание фабрики для генерации однотипных объектов: `export function createObj() { return {name: 'Petr'} }`  
+
+---
+
+`Import Maps` - возможность давать короткие имена модулям и мапить их на URL. <mark>Baseline 2023 </mark>
+
+```html
+<script type="importmap">
+{
+  "imports": {
+    "browser-fs-access": "https://unpkg.com/browser-fs-access@0.33.0/dist/index.modern.js"
+  }
+}
+</script>
+
+
+<script type="module">
+  import { fileOpen } from "browser-fs-access";
+</script>
+```
 
 [Вернуться к содержанию](#содержание)
 
