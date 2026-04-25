@@ -828,10 +828,45 @@ function carry(fn) {
 Передаваемый "объект" должен обладать одним из двух свойств: 1) элементы должны быть проиндексированы и иметь свойство length; 2) реализован Iterable интерфейс  
 При создании массива происходит поверхностное копирование  
 Вместо последовательного вызова Array.from(arr).map() в качестве второго аргумента можно передать колбек-map-функции, т.о. исключается создавание промежуточного массива  
-* `Array.fromAsync(arrayLike[, mapFn[, thisArg]])` - возвращает **новый массив** из асинхронного итерируемого или массивоподобного объекта  
-В качестве второго аргумента можно передать колбек-map-функции, применяемый к результатам промиса.  
-**Отличие от `Promise.all`:** ожидает каждое полученное значение последовательно, не дожидаясь всех значений одновременно    
-**Отличие от `Array.from`:** возвращает значения промисов, а не сами промисы
+* `Array.fromAsync(arrayLike[, mapFn[, thisArg]])` - метод возвращает **новый** массив из асинхронно итерируемого, синхронно итерируемого или `array-like` объекта <font color="#7ead74">_**[Baseline 2024]**_</font>, где  
+  * `items` - `async iterable`, `iterable` или `array-like` объект
+  * `mapFn(element, index)` - функция преобразования элементов, может быть асинхронной
+  * `thisArg` - значение `this` для `mapFn`
+
+В отличие от `Array.from()`:
+* умеет работать с асинхронными итерируемыми объектами
+* возвращает `Promise`, который зарезолвится в массив
+* если передан НЕ асинхронный итерируемый объект, то каждый добавляемый элемент сначала внутренне ожидается (`await`)
+* если передан `mapFn`, то результат `mapFn` также внутренне ожидается (`await`)
+
+В отличие от `Promise.all()`:
+* ожидает значения последовательно
+* итерируется лениво и не получает следующий элемент, пока текущий не завершился
+
+```js
+function* makeIterableOfPromises() {
+  for (let i = 0; i < 5; i++) {
+    yield new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+(async () => {
+  let start = Date.now();
+  await Array.fromAsync(makeIterableOfPromises());
+  let end = Date.now();
+
+  console.log("Array.fromAsync:", end - start, "ms");
+  // Array.fromAsync() time: ~500ms
+
+  start = Date.now();
+  await Promise.all(makeIterableOfPromises());
+  end = Date.now();
+  
+  console.log("Promise.all:", end - start, "ms");
+  // Promise.all() time: ~100ms
+})();
+```
+
 ```javascript
 const wait = (ms) => new Promise((res) => setTimeout(() => res(ms), ms)
 const promises = [wait(1000), wait(2000), wait(3000)]
@@ -842,6 +877,54 @@ console.log(result) // [Promise, Promise, Promise]
 const resultAsync = await Array.fromAsync(promises, (el) => element * 2)
 console.log(resultAsync) // [2000, 4000, 6000]
 ```
+
+> `Array.fromAsync()` не всегда корректно закрывает `sync iterable`, если ошибка возникает во время `await` значения, а не во время самой итерации.
+
+<details>
+	<summary>Пример</summary>
+
+```js
+function* numbers() {
+  try {
+    // generator `numbers()` возвращает `Promise`
+    yield Promise.resolve(1);
+    // второй `Promise` завершается с ошибкой
+    yield Promise.reject(new Error("Error"));
+  // finally внутри generator не выполняется
+  } finally {
+    console.log("generator closed");
+  }
+}
+
+(async () => {
+  try {
+    await Array.fromAsync(numbers());
+  } catch (error) {
+    // `Array.fromAsync()` пробрасывает ошибку, но не вызывает закрытие исходного iterator
+    console.log("caught:", error.message);
+  }
+})();
+
+// caught: Error
+// "generator closed" не выведется
+
+// При ручном `for...of` + `await` generator закрывается корректно, поэтому `finally` выполняется.
+(async () => {
+  const result = [];
+
+  try {
+    for (const value of numbers()) {
+      result.push(await value);
+    }
+  } catch (error) {
+    console.log("caught:", error.message);
+  }
+})();
+// generator closed
+// caught: Error
+```
+</details>
+
 [Array.fromAsync на видео](https://www.youtube.com/watch?v=7fTMx6QaFpY)  
 
 **Добавление/удаление элементов массива**
@@ -1093,8 +1176,9 @@ obj.hasOwnProperty(obj, 'age') // false
 [Отличие hasOwn от hasOwnProperty (vpn)](https://javascript.plainenglish.io/in-vs-hasown-vs-hasownproperty-in-javascript-885771d2d100)  
 [Отличие hasOwn от hasOwnProperty на русском](https://www.dev-notes.ru/articles/javascript/check-if-a-object-property-exists/)  
 
-* `Object.groupBy(items, callbackFn(element, index){})` - группирует свойства итерируемого объекта способом указанным в колбек-функции   
->Колбек-функция всегда должна возвращать строку с ключом группировки
+* `Object.groupBy(items, callbackFn(element, index){})` - группирует свойства итерируемого объекта способом указанным в колбек-функции <font color="#7ead74">_**[Baseline 2024]**_</font>   
+  Возвращают `null`-prototype объект с группированными элементами. При этом не происходит глубокого копирования.  
+>Колбек-функция должна возвращать строку/символ указывающую на группу элемента. Значения, не соответствующие разрешенным типам, приводятся к строке.  
 ```javascript
 const persons = [
 	{name: 'Petr', age: 16},
@@ -1564,8 +1648,9 @@ testMap.set('name', 'Petr').set('age', 18) // можно выстраивать 
 * testMap.entries() - возвращает итератор пар ключ-значение (в порядке добавления)  
 При использовании в цикле по умолчанию всегда вызывается map.entries(): `for(let [key, value] of testMap) {...}`  
 Трансформация коллекции в объект: `Object.fromEntries(testMap.entries())`  
-* Map.groupBy(items, callbackFn) - возвращает **`Map`** сгрупированных элементов по правилам callbackFn. Работа аналогична `Object.groupBy()`  
-`items` - итерируемая сущность  
+* Map.groupBy(items, callbackFn) - возвращает **`Map`** сгрупированных элементов по правилам callbackFn. Работает аналогично `Object.groupBy()` <font color="#7ead74">_**[Baseline 2024]**_</font>   
+  * `items` - итерируемая сущность  
+  * `callbackFn(element, index)` - функция группировки. Должна возвращать строку/символ указывающую на группу элемента. Значения, не соответствующие разрешенным типам, приводятся к строке.  
 ```javascript
 const persons = [
 	{name: 'Petr', age: 16},
@@ -1594,33 +1679,33 @@ console.log(groupedByAge.get('young')) // [ {name: 'Petr', age: 16} ]
 * `testSet.clear()` - очищает коллекцию  
 * `testSet.forEach(callbackFn(element[,key[,mapCollection]])[, thisArg])` - - стандартный метод forEach для коллекции Set  
 * `testSet.values()` - возвращает итератор всех значений коллекции (в порядке добавления)  
-* `testSet.difference(other)` - возвращает разницу между `testSet` и `other`  
+* `testSet.difference(other)` - возвращает разницу между `testSet` и `other` <font color="#7ead74">_**[Baseline 2024]**_</font>  
 ```javascript
 const testSet = new Set([1,3,5,7,9])
 const anotherSet = new Set([1,4,9])
 console.log(testSet.difference(anotherSet)) // Set(3) {3,5,7}
 ```
-* `testSet.intersection(other)` - возвращает пересечение `testSet` с `other`  
+* `testSet.intersection(other)` - возвращает пересечение `testSet` с `other` <font color="#7ead74">_**[Baseline 2024]**_</font>  
 ```javascript
 const testSet = new Set([1,3,5,7,9])
 const anotherSet = new Set([1,4,9])
 console.log(testSet.intersection(anotherSet)) // Set(2) {1,9}
 ```
-* `testSet.symmetricDifference(other)` - возвращает симметричную разницу между `testSet` и `other`  
+* `testSet.symmetricDifference(other)` - возвращает симметричную разницу между `testSet` и `other` <font color="#7ead74">_**[Baseline 2024]**_</font>  
 ```javascript
 const testSet = new Set([1,3,5,7,9])
 const anotherSet = new Set([1,4,9])
 console.log(testSet.symmetricDifference(anotherSet)) // Set(4) {3,5,7,4}
 ```
-* `testSet.union(other)` - возвращает объединение `testSet` с `other`  
+* `testSet.union(other)` - возвращает объединение `testSet` с `other` <font color="#7ead74">_**[Baseline 2024]**_</font>  
 ```javascript
 const testSet = new Set([1,3,5,7,9])
 const anotherSet = new Set([1,4,9])
 console.log(testSet.union(anotherSet)) // Set(4) {1,3,5,7,9,4}
 ```
-* `testSet.isDisjointFrom(other)` - возвращает boolean, проверяя есть ли элементы из `testSet` в `other`  
-* `testSet.isSubsetOf(other)` - возвращает boolean, проверяя содержатся ли все элементы из `testSet` в `other`  
-* `testSet.isSupersetOf(other)` - возвращает boolean, проверяя есть ли элементы из `other` в `testSet`
+* `testSet.isDisjointFrom(other)` - возвращает boolean, проверяя есть ли элементы из `testSet` в `other` <font color="#7ead74">_**[Baseline 2024]**_</font>  
+* `testSet.isSubsetOf(other)` - возвращает boolean, проверяя содержатся ли все элементы из `testSet` в `other` <font color="#7ead74">_**[Baseline 2024]**_</font>  
+* `testSet.isSupersetOf(other)` - возвращает boolean, проверяя есть ли элементы из `other` в `testSet` <font color="#7ead74">_**[Baseline 2024]**_</font>  
 
 `other` - `Set` или объект похожий на `Set`, т.е. имеющий свойства `size, has, keys` (например `Map`)
 
@@ -1810,7 +1895,13 @@ promises.then(res => console.log(res)) // [ {"status": "fulfilled", "value": "Pe
 * `Promise.race([promise1, promise2, ...promiseN])` - параллельно запускает несколько промисов и ожидает первый завершенный промис (с ошибкой или без)   
 Возвращает промис, который выполнится если первый завершенный промис завершится успешно или отклонится, если первый завершенный промис завершится с ошибкой  
 **Нельзя передавать пустой массив!** иначе промис зависнет не получив исполненного промиса или значения  
-* `Promise.withResolvers()` - метод, возвращающий объект {promise, resolve, reject}  
+* `Promise.withResolvers()` - метод для "внешнего управления промисом", когда сам `Promise` создается в одном месте, а выполнить или отклонить его нужно позже и в другом месте кода. <font color="#7ead74">_**[Baseline 2024]**_</font>    
+Возвращает объект с ключами:
+  * `promise` - новый `Promise`
+  * `resolve` - функция для выполнения `promise`
+  * `reject` - функция для отклонения `promise`
+  
+
 Является упрощением записи:  
 ```javascript
 let resolve, reject;
@@ -1819,6 +1910,18 @@ const promise = new Promise((res, rej) => {
   reject = rej;
 });
 ```
+
+Пример использования:
+```js
+const { promise, resolve, reject } = Promise.withResolvers();
+
+setTimeout(() => resolve("Done"), 1000);
+
+promise.then((value) => {
+  console.log(value);
+});
+```
+
 [Разбор с примером](https://www.youtube.com/watch?v=8Guo321ACcU)
 
 При передаче в методы не промиса, а значения любого типа (текст, число и т.д.) оно вернется раньше любого промиса, т.к. уже вычислено 
@@ -2325,7 +2428,7 @@ console.log(obj) // {name: 'Olga'}
 
 ---
 
-`Import Maps` - возможность давать короткие имена модулям и мапить их на URL. <mark>Baseline 2023 </mark>
+`Import Maps` - возможность давать короткие имена модулям и мапить их на URL. <font color="#7ead74">_**[Baseline 2023]**_</font>
 
 ```html
 <script type="importmap">
