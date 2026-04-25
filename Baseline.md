@@ -620,26 +620,203 @@ promise.then((value) => {
 
 ### Январь 2026
 
+`:active-view-transition` - псевдокласс root-элемента для стилизации страницы, пока выполняется `view transition`.  
+
+---
+
+Новые единицы измерения на основе типографики документа:
+* `rcap` - cap height шрифта root-элемента
+* `rch` - ширина символа `0` в шрифте root-элемента
+* `rex` - x-height шрифта root-элемента
+* `ric` - ширина идеографического символа (`水`) в шрифте root-элемента
+
+---
+
+JavaScript modules in service workers - поддержка `import` / `export` внутри service worker через регистрацию с `type: "module"`.
+
+---
+
+`animation-composition` - CSS-свойство, определяющее, как несколько анимаций комбинируются, если одновременно влияют на одно и то же свойство:
+* `replace` - новая анимация заменяет текущее значение свойства
+* `add` - новая анимация добавляется к текущему значению
+* `accumulate` - значения анимаций накапливаются
+
+Полезно, при использовании `transform` / `filter`. Не нужно заново переписывать свойство, можно добавить новый эффект поверх уже существующего.
+
+```css
+.card {
+  transform: translateX(40px);
+  animation: float 2s ease-in-out infinite;
+  animation-composition: add;
+}
+
+@keyframes float {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-20px);
+  }
+}
+```
+
+Без `animation-composition: add` анимация `transform` заменила бы исходный `translateX(40px)`.
+С `add` итоговый transform комбинируется: элемент сохраняет смещение по `X` и одновременно анимируется по `Y`.
+
+---
+
+Navigation API - современный Web API для работы с навигацией страницы и history stack. (замена History API)  
+
+В сравнении с History API:
+* единое событие `navigate` для разных типов переходов
+* можно перехватывать переходы  через `event.intercept()`
+* удобнее работать с history entries, а не только с текущим URL
+* лучше подходит для SPA, form navigation, scroll restoration и View Transitions
+
+Основные методы:
+* `navigate(url)` - переход к новому адресу
+* `back()` - назад по истории
+* `forward()` - вперед по истории
+* `reload()` - перезагрузка текущей записи
+* `traverseTo(key)` - переход к конкретной записи history по ключу
+
+`navigate()` и другие методы навигации возвращают объект с промисами:
+* `committed` - выполняется, когда URL уже изменен и navigation entry создана
+* `finished` - выполняется после полного завершения навигации
+
+`NavigateEvent` - событие Navigate API, срабатывающее для любых типов переходов, в том числе из History API (`History.go`)  
+Свойства:  
+* `canIntercept` - можно ли перехватить текущую навигацию (`Boolean`)
+* `destination` - объект с данными [NavigationDestination](https://developer.mozilla.org/en-US/docs/Web/API/NavigationDestination) о destination URL
+* `downloadRequest` - имя скачиваемого файла при download navigation (`<a>` или `<area>`) иначе `null`
+* `formData` - данные формы [FormData](https://developer.mozilla.org/en-US/docs/Web/API/NavigateEvent/formData) при POST запросе иначе `null`
+  `hashChange` - является ли переход только сменой hash/fragment (`Boolean`)
+* `hasUAVisualTransition` - была ли браузером уже выполнена visual transition (`Boolean`)
+* `info` - произвольные данные, переданные при навигаци или `undefined`, если данные не переданы
+* `navigationType` - тип навигации: `push`, `replace`, `reload`, `traverse`
+* `signal` - [AbortSignal](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal), который abort-ится при отмене навигации
+* `sourceElement` - [элемент](https://developer.mozilla.org/en-US/docs/Web/API/Element), инициировавший навигаци
+* `userInitiated` - была ли навигация запущена пользователем (`Boolean`)  
+
+Методы:  
+* `intercept(options)` - перехватывает навигацию и превращает ее в same-document navigation
+* `scroll()` - вручную запускает browser-managed scroll restoration
+
+События завершения:
+* `navigatesuccess` - срабатывает после успешного завершения навигации
+* `navigateerror` - срабатывает при ошибке в процессе навигации
+
 ### Февраль 2026
+
+`shape()` - новая функция для задания формы в `clip-path` и траектории в `offset-path`  
+В отличие от `path()`, использует более удобный CSS-синтаксис, поддерживает разные CSS units и math functions (`calc()`, `max()`, `abs()`).
+
+---
+
+Trusted Types API — это механизм защиты от DOM-based XSS, который при включенном CSP (`require-trusted-types-for`) запрещает передавать обычные строки в опасные места DOM (innerHTML, outerHTML, insertAdjacentHTML, script.src и т.д.)  
+Вместо строки нужно передавать специальный объект: [TrustedHTML](https://developer.mozilla.org/en-US/docs/Web/API/TrustedHTML), [TrustedScript](https://developer.mozilla.org/en-US/docs/Web/API/TrustedScript), [TrustedScriptURL](https://developer.mozilla.org/en-US/docs/Web/API/TrustedScriptURL), созданные через trusted policy    
+```js
+const target = document.querySelector("#output");
+
+const policy = trustedTypes.createPolicy("secure-policy", {
+  createHTML(input) {
+    return DOMPurify.sanitize(input);
+  },
+});
+
+const safeHtml = policy.createHTML(userInput);
+
+const userInput = `<img src=x onerror=alert(1)>`;
+// При передаче обычной строки при включенном CSP выкинет ошибку
+element.innerHTML = safeHtml;
+```
+
+---
+
+Новые методы `Map`: `getOrInsert()`, `getOrInsertComputed()`  
+* `getOrInsert(key, defaultValue)` - возвращает значение по ключу. Если ключа нет, вставляет `defaultValue` и возвращает его.  
+* `getOrInsertComputed(key, callback(key))` - возвращает значение по ключу. Если ключа нет, вызывает `callback(key)`, вставляет результат и возвращает его.  
+
+```js
+// Было
+if (!map.has(key)) {
+  map.set(key, []);
+}
+map.get(key).push(value);
+
+// Стало
+map.getOrInsert(key, []).push(value);
+```
+
+>При использовании `getOrInsert()` значение по умолчанию вычисляется каждый раз, даже когда ключ в Map  
+
+
+```js
+const map = new Map([["bar", "foo"]]);
+
+function createDefaultValue(key) {
+  console.log(`Creating default for ${key}`);
+  return `default for ${key}`;
+}
+
+map.getOrInsert("bar", createDefaultValue("bar"));
+// лог будет, хотя значение уже есть
+
+map.getOrInsertComputed("bar", createDefaultValue);
+// лог не будет, потому что callback не вызовется
+```
+
+---
+
+`dirname ` - атрибут для `<input>`, `textarea`, который при отправке формы добавляет отдельное поле с направлением введенного текста (`ltr` или `rtl`).
 
 ### Март 2026
 
-### Апрель 2026
+Новое семейство шрифтов `math` для отображения математических выражений
 
-### Май 2026
+---
 
-### Июнь 2026
+Добавлен новый метод `concat()` в `Iterator` для объединения нескольких итерируемых сущностей: `Iterator.concat(it1, it2)`  
+```js
+// Было
+const result = [...iter1, ...iter2];
 
-### Июль 2026
+// Стало
+const result = Iterator.concat(iter1, iter2);
+```
 
-### Август 2026
+```js
+const map1 = new Map([["a", 1], ["b", 2]]);
+const map2 = new Map([["a", 5], ["d", 4]]);
 
-### Сентябрь 2026
+const map = new Map(Iterator.concat(map1, map2, map3)); // Map(5) {'a' => 5, 'b' => 2, 'd' => 4}
+```
 
-### Октябрь 2026
+---
 
-### Ноябрь 2026
+`text-indent: each-line` - отступ первой строки блочного контейнера и каждой строки после принудительного переноса (не влияет на мягкий перенос)
+`text-indent: hanging` - отступ для всех строк кроме первой  
 
-### Декабрь 2026
+`hyphens` - CSS свойство, управляет переносом слов: `none`, `manual`, `auto`.
+`hyphenate-character` - CSS свойство, задает символ, который будет использоваться в конце строки при переносе слова.
+
+`contain-intrinsic-size` - задает браузеру примерный размер элемента, пока его содержимое не отрисовано полностью. (шорткат для `contain-intrinsic-width`, `contain-intrinsic-height`)
+Уменьшает сдвиг макета.
+
+`image-set()` - CSS-функция для выбора наиболее подходящего изображения в зависимости от характеристик устройства, например плотности пикселей. Аналог `srcset` для CSS-фоновых изображений.
+
+`navigator.storage` - API для проверки quota и persistent storage, доступного объема хранилища и запроса persistent storage, чтобы браузер не удалял данные сайта при нехватке места.
+
+`overflow-block`, `overflow-inline` - media features для определения того, как устройство обрабатывает переполнение viewport по блочной и inline осям.
+
+`update` - media feature, определяющая, как часто устройство может обновлять отображение контента (`fast`, `slow`, `none`).
+
+---
+
+Остальное:  
+* Добавлены новые события для акселерометра и гироскопа - [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Device_orientation_events)
+* Readable byte streams - [MDN](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamBYOBReader)
+* Reporting API - [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Reporting_API)
+* WebTransport API - low-level HTTP/3 transport API, более гибкая альтернатива WebSockets для streams и datagrams. [MDN](https://developer.mozilla.org/en-US/docs/Web/API/WebTransport_API)
 
 [Вернуться к содержанию](#содержание)
