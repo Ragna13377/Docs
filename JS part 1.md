@@ -1399,7 +1399,24 @@ function MakeIterator {
 ```
 
 По умолчанию Iterable интерфейс реализован в: `String, Array, Map, Set`  
-Итератор позволяет применить к итерируемой сущности: деструктуризацию, преобразование `Array.from`, оператор `spread`    
+Итератор позволяет применить к итерируемой сущности: деструктуризацию, преобразование `Array.from`, оператор `spread`  
+
+Метод `concat()` в `Iterator` позволяет объедить нескольких итерируемых сущностей: `Iterator.concat(it1, it2)`
+```js
+// Было
+const result = [...iter1, ...iter2];
+
+// Стало
+const result = Iterator.concat(iter1, iter2);
+```
+
+```js
+const map1 = new Map([["a", 1], ["b", 2]]);
+const map2 = new Map([["a", 5], ["d", 4]]);
+const map3 = new Map([["e", 10]]);
+
+const map = new Map(Iterator.concat(map1, map2, map3)); // Map(4) { 'a' => 5, 'b' => 2, 'd' => 4, 'e' => 10 }
+```
 
 [Вернуться к содержанию](#содержание)
 
@@ -1648,7 +1665,7 @@ testMap.set('name', 'Petr').set('age', 18) // можно выстраивать 
 * testMap.entries() - возвращает итератор пар ключ-значение (в порядке добавления)  
 При использовании в цикле по умолчанию всегда вызывается map.entries(): `for(let [key, value] of testMap) {...}`  
 Трансформация коллекции в объект: `Object.fromEntries(testMap.entries())`  
-* Map.groupBy(items, callbackFn) - возвращает **`Map`** сгрупированных элементов по правилам callbackFn. Работает аналогично `Object.groupBy()` <font color="#7ead74">_**[Baseline 2024]**_</font>   
+* testMap.groupBy(items, callbackFn) - возвращает **`Map`** сгрупированных элементов по правилам callbackFn. Работает аналогично `Object.groupBy()` <font color="#7ead74">_**[Baseline 2024]**_</font>   
   * `items` - итерируемая сущность  
   * `callbackFn(element, index)` - функция группировки. Должна возвращать строку/символ указывающую на группу элемента. Значения, не соответствующие разрешенным типам, приводятся к строке.  
 ```javascript
@@ -1660,6 +1677,37 @@ const persons = [
 const groupedByAge = Map.groupBy(persons, ({age}) =>  age < 18 ? 'young' : 'old');
 console.log(groupedByAge.get('young')) // [ {name: 'Petr', age: 16} ]
 ```
+* testMap.getOrInsert(key, defaultValue) - возвращает значение по ключу. Если ключа нет, вставляет `defaultValue` и возвращает его. <font color="#7ead74">_**[Baseline 2026]**_</font>
+* testMap.getOrInsertComputed(key, callback(key)) - возвращает значение по ключу. Если ключа нет, вызывает `callback(key)`, вставляет результат и возвращает его. <font color="#7ead74">_**[Baseline 2026]**_</font>
+```js
+// Было
+if (!map.has(key)) {
+  map.set(key, []);
+}
+map.get(key).push(value);
+
+// Стало
+map.getOrInsert(key, []).push(value);
+```
+
+>При использовании `getOrInsert()` значение по умолчанию вычисляется каждый раз, даже когда ключ в Map
+
+
+```js
+const map = new Map([["bar", "foo"]]);
+
+function createDefaultValue(key) {
+  console.log(`Creating default for ${key}`);
+  return `default for ${key}`;
+}
+
+map.getOrInsert("bar", createDefaultValue("bar"));
+// лог будет, хотя значение уже есть
+
+map.getOrInsertComputed("bar", createDefaultValue);
+// лог не будет, потому что callback не вызовется
+```
+
 
 [Вернуться к содержанию](#содержание)
 
