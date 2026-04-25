@@ -1,10 +1,11 @@
 # Содержание
 
 - [Baseline 2023](#baseline-2023)
-  - [HTML](#html)
-  - [CSS](#css)
-  - [JS](#js)
+  - [HTML & CSS](#html--css)
+  - [JavaScript & Web API](#javascript--web-api)
 - [Baseline 2024](#baseline-2024)
+  - [HTML & CSS](#html--css-1)
+  - [JavaScript & Web API](#javascript--web-api-1)
 - [Baseline 2025](#baseline-2025)
   - [Январь 2025](#январь-2025)
   - [Февраль 2025](#февраль-2025)
@@ -22,19 +23,10 @@
   - [Январь 2026](#январь-2026)
   - [Февраль 2026](#февраль-2026)
   - [Март 2026](#март-2026)
-  - [Апрель 2026](#апрель-2026)
-  - [Май 2026](#май-2026)
-  - [Июнь 2026](#июнь-2026)
-  - [Июль 2026](#июль-2026)
-  - [Август 2026](#август-2026)
-  - [Сентябрь 2026](#сентябрь-2026)
-  - [Октябрь 2026](#октябрь-2026)
-  - [Ноябрь 2026](#ноябрь-2026)
-  - [Декабрь 2026](#декабрь-2026)
 
 ## Baseline 2023
 
-### HTML
+### HTML & CSS
 
 `inert` - атрибут, отключающий интерактивность элемента и всего его subtree. [MDN](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/inert)  
 Блокирует `click`/`focus` события, отключает выделение (`user-select`) и редактирование (`input`, `textarea`, `contenteditable`), убирает subtree из дерева доступности (AOM) и исключает из поиска по странице (`Ctrl+F` и аналоги).     
@@ -75,9 +67,7 @@
 
 Добавлен семантический тег `<search>` для полей поиска и фильтрации  
 
-[Вернуться к содержанию](#содержание)
-
-### CSS
+---
 
 Добавлен нативный nesting в CSS, аналог вложенности в препроцессорах (`SASS`, `LESS` и т.д.).
 ```css
@@ -249,7 +239,7 @@ ol.custom {
 
 [Вернуться к содержанию](#содержание)
 
-### JS
+### JavaScript & Web API
 
 `Import Maps` - возможность давать короткие имена модулям и мапить их на URL.
 
@@ -293,6 +283,308 @@ ol.custom {
 [Вернуться к содержанию](#содержание)
 
 ## Baseline 2024
+
+### HTML & CSS
+
+У нативного аккордеона `<details>` появилась возможность оставлять открытым только один блок, если нескольким элементам задан одинаковый `name`.
+```html
+<details name="accordion">
+  <summary>First</summary>
+  <p>…</p>
+</details>
+<details name="accordion">
+  <summary>Second</summary>
+  <p>…</p>
+</details>
+```
+
+`scrollbar-gutter` - позволяет зарезервировать место для скролбара, при его отсутствии, чтобы избежать сдвига макета.
+* stable - место под скроллбар резервируется даже при отсутствии переполнения
+* both-edges - аналогично stable, но также резервируется место симметрично с другой стороны экрана
+* auto - стандартное поведение
+
+`scrollbar-width` - ширина скролл-бара (`auto`, `thin`, `none`)
+
+---
+
+`backdrop-filter` - накладывает визуальные эффекты (blur, contrast и т.д.) на фон за элементом
+
+---
+
+`font-size-adjust` - подстраивает размер fallback-шрифта так, чтобы он выглядел ближе к основному шрифту по выбранной метрике.  
+
+---
+
+`::target-text` - псевдоэлемент для стилизации текста, к которому браузер проскроллил страницу через text fragments (`#:~:text=...`)
+
+---
+
+CSS relative color syntax - возможность через ключевое слово `from` создавать новый цвет на основе другого цвета, получая доступ к его каналам (`r`, `g`, `b`, `h`, `s`, `l`, `alpha` и т.д.) и изменяя их.
+Пример:  
+`rgb(from green b r g)`
+
+![](https://developer.chrome.com/static/blog/css-relative-color-syntax/image/a-diagram-the-syntax-rgb-3bffe6c436572.png)
+
+[Примеры](https://developer.chrome.com/blog/css-relative-color-syntax)
+
+---
+
+`@starting-style` - директива для анимирования entry transitions элемента перед его появлением/рендером, в том числе для дискретных свойств (`display`, `visibility`, `mix-blend-mode` и аналогов).  
+Для анимации дискретных свойств  дополнительно нужно задать `transition-behavior: allow-discrete` или в шорткате `transition`  
+
+```css
+#target {
+  display: block;
+  opacity: 1;
+  transition:
+    opacity 0.5s ease,
+    display 0.5s ease allow-discrete;
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+#target.hidden {
+  display: none;
+  opacity: 0;
+}
+```
+
+---
+
+`@property <custom-property-name> { syntax, inherits, initial-value }` - директива для регистрации типизированных кастомных CSS-свойств, где  
+* `syntax` - допустимый тип значения ("<angle>", "<color>", "<image>" и т.д.) [Полный список значений](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@property/syntax)
+* `inherits` - наследуемость свойства (boolean)
+* `initial-value` - значение по умолчанию, если свойство не задано или невалидно
+
+```css
+@property --customColor {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: red;
+}
+
+div {
+  background-color: var(--customColor);
+}
+```
+
+---
+
+`color-interpolation` - свойство определяющее цветовое пространство `linearGradient` и `radialGradient` в SVG (auto, sRGB, linearRGB)  
+
+---
+
+`light-dark(lightColor, darkColor)` - функция, выбирающая один из двух цветов в зависимости от текущего `color-scheme`  
+```css
+/* Было */
+:root {
+  --primary-color: #ccc;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-color: #333;
+  }
+}
+
+/* Стало */
+:root {
+  /* для работы функции light-dark необходимо задать color-scheme  */
+  color-scheme: light dark;
+  background-color: light-dark(#ccc, #333);
+}
+```
+
+---
+
+Новые функции CSS Math:
+* `round()` - округление по заданной стратегии и шагу
+* `rem()` - остаток от деления со знаком делимого
+* `mod()` - остаток по модулю со знаком делителя
+
+---
+
+`offset-position` - стартовая позиция элемента для анимации/движения, заданного через `offset-path`.
+
+---
+
+`align-content` - позволяет выравнивать содержимое блочных и табличных контейнеров по вертикали без перевода контейнера в `flex` или `grid`.
+
+[Вернуться к содержанию](#содержание)
+
+### JavaScript & Web API
+
+Для `Set` добавлены методы операций над множествами (`union`, `intersection`, `difference`, `symmetricDifference`) и методы сравнения множеств (`isSubsetOf`, `isSupersetOf`, `isDisjointFrom`).  
+[Примеры](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set)
+
+---
+
+Добавлены методы `resize()` и `transfer()` для `ArrayBuffer`
+
+---
+
+`CustomStateSet` - `Set`-like коллекция внутренних состояний custom element, доступная через `ElementInternals.states`.  
+Используется для хранения кастомных состояний элемента и их последующего использования в CSS через `:state(...)`.  
+[MDN](https://developer.mozilla.org/en-US/docs/Web/API/CustomStateSet)
+
+---
+
+Добавлен `Intl.Segmenter` для правильной разбивки текста на части с учетом языка (на слова, предложения или графемы)  
+
+---
+
+`Object.groupBy(items, callbackFn)`, `Map.groupBy(items, callbackFn)` - методы группировки элементов, где  
+* `items` - итерируемая сущность
+* `callbackFn(element, index)` - функция группировки. Должна возвращать строку/символ указывающую на группу элемента  
+Значения, не соответствующие разрешенным типам, приводятся к строке. 
+
+Возвращают `null`-prototype объект / `Map` с группированными элементами. При этом не происходит глубокого копирования.  
+```js
+const persons = [
+  { name: "Petr", age: 18 },
+  { name: "Olga", age: 21 },
+  { name: "Pavel", age: 15 },
+  { name: "Kate", age: 27 },
+];
+
+const groupedPersons = Object.groupBy(persons, (person) => {
+  return person.age >= 18 ? "adults" : "children";
+});
+
+/*
+{
+  adults: [
+    { name: "Petr", age: 18 },
+    { name: "Olga", age: 21 },
+    { name: "Kate", age: 27 }
+  ],
+  children: [
+    { name: "Pavel", age: 15 }
+  ]
+}
+*/
+console.log(groupedPersons);
+```
+
+---
+
+`Array.fromAsync(items, mapFn, thisArg)` - метод для создания нового массива из асинхронно итерируемого, синхронно итерируемого или `array-like` объекта, где  
+* `items` - `async iterable`, `iterable` или `array-like` объект
+* `mapFn(element, index)` - функция преобразования элементов, может быть асинхронной
+* `thisArg` - значение `this` для `mapFn`  
+
+В отличие от `Array.from()`:  
+* умеет работать с асинхронными итерируемыми объектами  
+* возвращает `Promise`, который зарезолвится в массив
+* если передан НЕ асинхронный итерируемый объект, то каждый добавляемый элемент сначала внутренне ожидается (`await`)
+* если передан `mapFn`, то результат `mapFn` также внутренне ожидается (`await`)  
+
+В отличие от `Promise.all()`:
+* ожидает значения последовательно
+* итерируется лениво и не получает следующий элемент, пока текущий не завершился
+
+```js
+function* makeIterableOfPromises() {
+  for (let i = 0; i < 5; i++) {
+    yield new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+(async () => {
+  let start = Date.now();
+  await Array.fromAsync(makeIterableOfPromises());
+  let end = Date.now();
+
+  console.log("Array.fromAsync:", end - start, "ms");
+  // Array.fromAsync() time: ~500ms
+
+  start = Date.now();
+  await Promise.all(makeIterableOfPromises());
+  end = Date.now();
+  
+  console.log("Promise.all:", end - start, "ms");
+  // Promise.all() time: ~100ms
+})();
+```
+
+> `Array.fromAsync()` не всегда корректно закрывает `sync iterable`, если ошибка возникает во время `await` значения, а не во время самой итерации.
+
+```js
+function* numbers() {
+  try {
+    // generator `numbers()` возвращает `Promise`
+    yield Promise.resolve(1);
+    // второй `Promise` завершается с ошибкой
+    yield Promise.reject(new Error("Error"));
+  // finally внутри generator не выполняется
+  } finally {
+    console.log("generator closed");
+  }
+}
+
+(async () => {
+  try {
+    await Array.fromAsync(numbers());
+  } catch (error) {
+    // `Array.fromAsync()` пробрасывает ошибку, но не вызывает закрытие исходного iterator
+    console.log("caught:", error.message);
+  }
+})();
+
+// caught: Error
+// "generator closed" не выведется
+
+// При ручном `for...of` + `await` generator закрывается корректно, поэтому `finally` выполняется.
+(async () => {
+  const result = [];
+
+  try {
+    for (const value of numbers()) {
+      result.push(await value);
+    }
+  } catch (error) {
+    console.log("caught:", error.message);
+  }
+})();
+// generator closed
+// caught: Error
+```
+
+---
+
+`Promise.withResolvers()` - метод для "внешнего управления промисом", когда сам `Promise` создается в одном месте, а выполнить или отклонить его нужно позже и в другом месте кода.  
+Возвращает объект с ключами:  
+* `promise` - новый `Promise`
+* `resolve` - функция для выполнения `promise`
+* `reject` - функция для отклонения `promise`
+
+Более короткая запись шаблона:  
+```js
+let resolve, reject;
+const promise = new Promise((res, rej) => {
+  resolve = res;
+  reject = rej;
+});
+```
+
+Пример использования:  
+```js
+const { promise, resolve, reject } = Promise.withResolvers();
+
+setTimeout(() => resolve("Done"), 1000);
+
+promise.then((value) => {
+  console.log(value);
+});
+```
+
+---
+
+Остальное:
+* Declarative Shadow DOM - [web.dev](https://web.dev/articles/declarative-shadow-dom), [MDN](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/template#declarative_shadow_dom)
+* Screen Wake Lock API - API для удержания экрана включенным во время активного сценария в веб-приложении. [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API)  
+
 
 [Вернуться к содержанию](#содержание)
 
