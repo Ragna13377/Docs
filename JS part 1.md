@@ -1401,7 +1401,36 @@ function MakeIterator {
 По умолчанию Iterable интерфейс реализован в: `String, Array, Map, Set`  
 Итератор позволяет применить к итерируемой сущности: деструктуризацию, преобразование `Array.from`, оператор `spread`  
 
-Метод `concat()` в `Iterator` позволяет объедить нескольких итерируемых сущностей: `Iterator.concat(it1, it2)`
+---
+
+Iterator helpers - набор методов на `Iterator.prototype`, которые позволяют обрабатывать итерируемые данные по мере прохода, без преобразования в промежуточный массив. <font color="#7ead74">_**[Baseline 2025]**_</font>  
+
+Методы:
+* `map()`, `filter()`, `reduce()`, `find()`, `some()`, `every()`, `flatMap()`, `forEach()`, `toArray()` - аналогичные массивам
+* `take(limit)` - берет первые `limit` значений из итератора
+* `drop(limit)` - пропускает первые `limit` значений
+
+```js
+const users = new Map([
+  [1, { name: "Petr", active: true }],
+  [2, { name: "Olga", active: false }],
+  [3, { name: "Pavel", active: true }],
+  [4, { name: "Kate", active: true }],
+]);
+
+const names = users.values()
+  .filter((user) => user.active)
+  .map((user) => user.name)
+  .take(2)
+  .toArray();
+
+console.log(names); // ["Petr", "Pavel"]
+```
+
+---
+
+
+Метод `concat()` в `Iterator` позволяет объедить нескольких итерируемых сущностей: `Iterator.concat(it1, it2)`  <font color="#7ead74">_**[Baseline 2026]**_</font>
 ```js
 // Было
 const result = [...iter1, ...iter2];
@@ -1943,6 +1972,16 @@ promises.then(res => console.log(res)) // [ {"status": "fulfilled", "value": "Pe
 * `Promise.race([promise1, promise2, ...promiseN])` - параллельно запускает несколько промисов и ожидает первый завершенный промис (с ошибкой или без)   
 Возвращает промис, который выполнится если первый завершенный промис завершится успешно или отклонится, если первый завершенный промис завершится с ошибкой  
 **Нельзя передавать пустой массив!** иначе промис зависнет не получив исполненного промиса или значения  
+* `Promise.try(callback)` - метод для запуска callback с автоматическим преобразованием и синхронных, и асинхронных ошибок в `Promise`-reject. <font color="#7ead74">_**[Baseline 2025]**_</font>  
+```js
+function parseJson(text) {
+  return JSON.parse(text); // может бросить sync error
+}
+
+Promise.try(() => parseJson("invalid json"))
+  .then((data) => console.log(data))
+  .catch((error) => console.log("caught:", error.message));
+```
 * `Promise.withResolvers()` - метод для "внешнего управления промисом", когда сам `Promise` создается в одном месте, а выполнить или отклонить его нужно позже и в другом месте кода. <font color="#7ead74">_**[Baseline 2024]**_</font>    
 Возвращает объект с ключами:
   * `promise` - новый `Promise`
@@ -2492,6 +2531,8 @@ console.log(obj) // {name: 'Olga'}
   import { fileOpen } from "browser-fs-access";
 </script>
 ```
+
+>JSON-модули можно импортировать с явным указанием типа, например `import data from "./data.json" with { type: "json" }`. <font color="#7ead74">_**[Baseline 2025]**_</font>
 
 [Вернуться к содержанию](#содержание)
 
