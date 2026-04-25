@@ -15,6 +15,7 @@
 ## Что внутри
 
 - [Browser](./Browser.md) — как работает браузер: DNS, TCP, TLS, HTTP, рендеринг, пайплайн загрузки страницы
+- [Baseline](./Baseline.md) — хронологический список новых web-platform фич по годам с короткими заметками и ссылками
 - [HTML and CSS](./HTML%20and%20CSS.md) — семантика HTML, формы, метатеги, CSS-база, layout, анимации, flex, grid и другое
 - [JS part 1](./JS%20part%201.md) — базовые темы JavaScript
 - [JS part 2](./JS%20part%202.md) — продолжение JavaScript и более сложные темы
