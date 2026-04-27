@@ -2,23 +2,22 @@
 
 - [1. Установка и TSconfig](#1-установка-и-tsconfig)
 - [2. Базовые типы](#2-базовые-типы)
-  - [2. unknown, null, undefined, void, never](#21-unknown-null-undefined-void-never)
+  - [2.1 unknown, null, undefined, void, never](#21-unknown-null-undefined-void-never)
 - [3. Функции](#3-функции)
   - [3.1 Параметры функции](#31-параметры-функции)
 - [4. Массивы и кортежи](#4-массивы-и-кортежи)
 - [5. Объекты](#5-объекты)
 - [6. Собственные типы, интерфейсы](#6-собственные-типы-интерфейсы)
-- [7 Enum](#7-enum)
+- [7. Enum](#7-enum)
 - [8. DOM и встроенные объекты](#8-dom-и-встроенные-объекты)
 - [9. Promise](#9-promise)
-- [10. Utility Type](#10-utility-type)
-- [11. keyof, infer, in и type guard](#11-keyof-infer-in-и-type-guard)
-- [12. Рекурсия](#12-рекурсия)
-- [13. Классы](#13-классы)
-- [14. Дженерики](#14-дженерики)
-- [15. Файлы .d.ts](#15-файлы-dts)
-- [16. Type Challenges](#16-type-challenges)
-- [17. Полезные ссылки](#17-полезные-ссылки)
+- [10. Дополнительные приемы типизации](#10-дополнительные-приемы-типизации)
+- [11. Рекурсия](#11-рекурсия)
+- [12. Дженерики](#12-дженерики)
+- [13. Utility Type](#13-utility-type)
+- [14. Файлы .d.ts](#14-файлы-dts)
+- [15. Кастомные типы](#15-кастомные-типы)
+- [16. Полезные ссылки](#16-полезные-ссылки)
 
 ## 1. Установка и TSconfig
 
@@ -300,7 +299,7 @@ const dictionary: { [key: string]: string } = {
 
 ## 6. Собственные типы, интерфейсы
 
-**Собственные типы** позволяют дать имя уже существующему типу или собрать новый тип из других типов.  
+**Собственные типы** позволяют дать имя уже существующему типу или собрать новый тип из других типов.
 
 ```typescript
 type Id = string
@@ -356,14 +355,14 @@ class ConsoleLogger implements Logger {
 
 **Отличия `type` от `interface`:**
 
-* `type` поддерживает пересечение (`&`) и объединение (`|`)  
-Интерфейсы и типы можно пересекать и объединять. При этом интерфейс трансформируется в тип.  
-* `type` нельзя объявить повторно с тем же именем
+* `type` поддерживает объединение (`|`) и пересечение (`&`)
+Интерфейсы и типы можно пересекать и объединять. При этом интерфейс трансформируется в тип.
 * `interface` можно расширять через `extends`
-* `interface` можно имплементировать классами `implements`  
-Тип можно имплементировать, но он трансформируется в интерфейс  
+* `interface` можно использовать в классе через `implements`
+Тип можно имплементировать, но он трансформируется в интерфейс
 >При этом имплементировать тип являющийся объединением нельзя
 
+* `type` нельзя объявить повторно с тем же именем
 * `interface` можно объявить несколько раз, и объявления объединятся
 ```typescript
 // WindowState будет содержать оба поля
@@ -411,42 +410,47 @@ const machine: Automat = {
 
 Обычный `enum` остается в JS после компиляции.
 
-```typesctipt
+```typescript
 enum Race {
-	Ork: 'Ork',
-	Human: 'Human'
-};
-let race = Race.Ork;
+	Ork = 'Ork',
+	Human = 'Human',
+}
+
+let race = Race.Ork
 ```
-Компилируется в:  
+
+Компилируется примерно в:
+
 ```javascript
 var Race;
 (function (Race) {
-    Race[Race["Ork"] = 0] = "Ork";
-    Race[Race["Ork"] = 1] = "Ork";
-    Race[Race["Human"] = 2] = "Human";
-    Race[Race["Human"] = 3] = "Human";
+	Race["Ork"] = "Ork";
+	Race["Human"] = "Human";
 })(Race || (Race = {}));
 let race = Race.Ork;
 ```
 
 `const enum` **теряет** часть функциональности при компиляции:
+
 ```typescript
 const enum Race {
-	Ork: 'Ork',
-	Human: 'Human'
-};
+	Ork = 'Ork',
+	Human = 'Human',
+}
+
 let race = Race.Ork
 ```
+
 Не компилируется в JS, а заменяется фактическим значением:
-```typescript
-let race = 0 /* Race.Ork */;
+
+```javascript
+let race = "Ork" /* Race.Ork */;
 ```
 
 Из-за этого у `const enum` есть ограничения:
 
 1. Нельзя использовать его как обычный runtime-объект: `for (let key in Race) {}` или `const enumKey = Race[race]`
-2. Нельзя использовать вычисляемые значения:  `const enum Size { small: config.smallSize }`
+2. Значения должны быть вычислимы компилятором: `const enum Size { small = config.smallSize }` Ошибка.
 
 Для сохранения `const enum` при компиляции, используется флаг `preserveConstEnums` в конфиге.
 
@@ -458,376 +462,729 @@ let race = 0 /* Race.Ork */;
 ## 8. DOM и встроенные объекты
 
 **DOM-элементы**
-  При поиске любого DOM-элемента он может быть не найден:
-`const element: HTMLElement | null = document.querySelector('.my-class')` // лучше проверять конкретный тип HTMLButtonElement и т.д.
-`if(element) {}` - обязательная проверка, что элемент найден
 
-Типизация событий:
-`function handleClick(event: Event){}` // лучше проверять конкретный тип MouseEvent
-`myButton.addEventListener('click', handleClick)`
+При поиске DOM-элемента он может быть не найден, поэтому результат может содержать `null`  
+Перед использованием элемент нужно проверить, что он найден
 
-Объект **Map** - коллекция пар ключ-значение
-`const mapObject = new Map<string, number>()`
+```typescript
+const element: HTMLElement | null = document.querySelector('.my-class')
 
-Объект **Set** - коллекция уникальных значений
-Используется для удаления дубликатов из массива: `[...new Set(arrayWithDoublesValue)]`
-`const setObject: Set<number> = new Set();`
+if (element) {
+   element.innerText = 'text'
+}
+```
 
-Объект **Date**
-`const myDate = new Date()` // текущая дата и время
-Сторонние библиотеки для упрощения работы с датами: dayjs (https://day.js.org/)
+Если нужен конкретный тип элемента, его лучше указать явно: `const button = document.querySelector<HTMLButtonElement>('.button')`
+
+**Типизация событий**
+
+```typescript
+function handleClick(event: MouseEvent): void {
+	console.log(event.clientX)
+}
+
+button?.addEventListener('click', handleClick)
+```
+
+**Map** - коллекция пар ключ-значение:
+
+```typescript
+const mapObject = new Map<string, number>()
+mapObject.set('count', 1)
+```
+
+**Set** - коллекция уникальных значений:
+
+```typescript
+const setObject = new Set<number>()
+setObject.add(1)
+```
 
 [Вернуться к содержанию](#содержание)
 
 ## 9. Promise
 
-**Promise**
-`type MyType = {id: number; name: string}`
-`function fetchData(): Promise<MyType>{`
-`return fetch(<url>).then((res) => { response.json() as MyType })`
-
-`}`
-
-При использовании синтаксиса async/await:
-`async function fetchData(): Promise<string>{...запрос; return data}`
-`type ResultType = Awaited<ReturnType<fetchData>>`
-`const result: ResultType = await fetchData()`
-
-[Вернуться к содержанию](#содержание)
-
-## 10. Utility Type
-
-**Utility Type** - **нужно ознакомиться со всеми вариантами утилитарных типов**
-* **Exclude<T, K>** - убирает типы K из T
-   `type Colors = 'black' | 'white' | 'red'`
-   `type BlackAndWhite = Exclude<Colors, 'red'>`
-
-* **Extract<T, K>** - достает из T те типы, которые расширяют K
-   `type Pass = 123 | 15 | 'pass' | 'token';`
-   `type PassNumbers = Extract<Pass, number>;` // `123 | 15`
-
-* **NonNullable<T>** - убирает все null и undefined
-   `type ApiResponse = string | undefined | null;`
-   `type ApiResponseValue = MyNonNullable<ApiResponse>` // `type ApiResponseValue = string`
-
-`type Account = {`
-`login: string;`
-`password?: string;`
-
-`}`
-
-* **Required** делает поля объектов обязательными
-   `type FullAccount = Required<Account>` // `type FullAccount = { login: string; password: string; }`
-
-* **Partial** делает поля опциональными
-   `type PartialAccount = Partial<Account>` // `type FullAccount = { login?: string; password?: string; }`
-
-* **Pick** создаёт новый тип, выбирая из объекта заданные поля
-   `type OnlyLogin = Pick<Account, 'login'>` // `type FullAccount = { login: string; }`
-
-* **Omit** исключает заданные поля из объекта
-   `type WithOutPassword = Omit<Account, 'password'>` // `type FullAccount = { login: string; }`
-
-* **Record<Key, Value>** - типизирует ключ-значение у объекта
-   `type Trafficlights = 'green' | 'yellow' | 'red';`
-   `const descriptions: Record<Trafficlights, string> = {}`
-
-* **Parameters и ReturnType** - выводят параметры и возвращаемое значение типа
-   `function getHexString(color: 'black' | 'white' | 'red') {`
-`if(color === 'black' return '#000'`
-`else return '#fff'`
-
-`}`
-
-`type Color = Parameters<typeof getHexString>[0]` // `type Color = " "black" | "white"`
-`type Hex = ReturnType<typeof getHexString>` // `type Hex = "#000" | "#fff" " `
-
-[Вернуться к содержанию](#содержание)
-
-## 11. keyof, infer, in и type guard
-
-**keyof** - указывает, какие ключи могут быть у объекта (для создания функций принимающих аргументом только те ключи, которые есть в объекте)
-`type Person: { name: string, age: number }`
-`function acceptProperty(obj: Person, key: keyof Person) { return obj[key] }` // prop может быть равно **только** "name", "age"
-`const nameValue = getProperty(person, 'name');` // nameValue имеет тип string
-`const ageValue  = getProperty(person, 'age');` // ageValue имеет тип number
-
-**infer** - извлекает и сохраняет типы для дальнейшего использования
-`type ObjectProperty<T> = T extends { a: infer U } ? U : never;` // проверка содержит ли `T` свойство `a`
-
-Если содержит, то `infer U` запоминает извлеченное свойство
-`type ExampleObject1 = { a: string };`
-`type ExtractedType1 = ObjectProperty<ExampleObject1>;` // Результат: string
-
-`type ExampleObject3 = { b: boolean };`
-`type ExtractedType3 = ObjectProperty<ExampleObject3>;` // Результат: never
-
-**Пример с in**
-`type FilterByProperty<Obj, Key extends string> = {`
-`[K in Key]: K extends keyof Obj ? Obj : never;`
-
-`}[Key];`
-`{ name: 'Petr', age: 18 }` // выведем **все свойства объекта, если хотя бы 1 содержится в Key**
-
-Если изменим:
-`type FilterByProperty<Obj, Key extends string> = {`
-`[K in Key]: K extends keyof Obj ? Obj[K] : never;`
-
-`};`
-`{ name: 'Petr', age: never }` - первое свойство принадлежит объекту, второе нет
-
-**Пример вывода объектов, в которых содержится определенное свойство**
-`type FilterByProperty<Obj, Key extends string> =`
-`Obj extends infer O`
-`? { [K in Key]?: any } extends O` // можно сократить `? O extends Record<Key, any>`
-`? O`
-`: never`
-
-`: never;`
-Если смогли извлечь из переданных данных переменную O и она соответствует `{ [K in Key]?: any }` или `Record<Key, any>`, то возвращаем `O`
-
-`type Administrator = { name: string; };`
-`type Developer = { name: string; computer: 'MacOS' | 'Windows'; };`
-
-`type Personal = Administrator | Developer;`
-`type WithComputers = FilterByProperty<Personal, 'computer'>;` // только в Developer содержится ключ computer
-
-`<something>` **is** `<type>` - **принадлежность к типу**
-
-`function func (obj: any): obj is MyType {...проверка соответствия типу MyType}` - функция - кастомный **typeguard** для проверки принадлежности к выбранному типу
-Возвращаемое значение объясняет TS'у, что возвращаемый объект точно принадлежит проверяемогу типу
-
-[Вернуться к содержанию](#содержание)
-
-## 12. Рекурсия
-
-**Рекурсия**
-`type Flatten<T extends any[]> = T extends [infer First, ...infer Rest]`
-`    ? First extends any[]`
-`        ? Flatten<First> | Flatten<Rest>`
-`        : [First] | Flatten<Rest>`
-
-`    : [];`
-Входные данные: `Flatten<[1, [2, [3, [4]]]]>`
-Раскладываем масив на First (1) и Rest (`[ [2, [3, [4]]] ]`), если входные данные не массив, то результат пустой массив `[]`
-Если First - массив, то рекурсивно вызываем Flatten для First и Rest, если не массив, то создаем из него массив `[First]` и рекурсивно вызываем Flatten для Rest
-Далее раскладываем пока не закончатся вложенные массивы
-
-[Вернуться к содержанию](#содержание)
-
-## 13. Классы
-
-*Создание класса:*
-`class MyClass {`
-`field1: string` // здесь прописываются все возможные свойства объекта. При использовании неуказанных свойств - ошибка
-`field2?: number` // поля в классе также могут быть опциональными
-`...`
-`constructor(field1: string, field2?: number) {`
-`this.field1 = field1;`
-`...`
-
-`}`
-`method1(arg: string): string {}` // методы класса тоже нужно типизировать
-`...`
-
-`}`
-
-*Можно сократить запись, используя модификаторы доступа:*
-`class MyClass {`
-`constructor(`**public** `field1: string, ...) {}` // внутри `{}` не нужно присваиваине. До конструктора не нужно описывать свойства объекта
-
-`}`
-
-*Геттеры и Сеттеры в TS*
-`class MyClass {`
-`name?: string` // опциональное поле
-`get name(){`
-`if(!this.name) {` // обязательная проверка существования поля
-`throw new Error('Поля не существует')`
-
-`}`
-`return this.name`
-`set name(value: string){`
-`this.name = value`
-
-`}`
-
-`}`
-
-**Интерфейсы** *объектов и классов*
-`interface MyObj {`
-`field1: string;`
-`field2?: string;`
-`field3: string|number;`
-`method1(arg1: string): string` // метод
-`method2?(arg1: string): string` // опциональный метод
-
-`}`
-`const obj: MyObj = {}`
-
-Можно задать тип сразу всем полям, если они одного типа: `[number]: string`
-
-Использование интерфейса в классе - **implements** : `class myClass implements MyClass {}`
-Использование нескольких интерфейсов в одном классе: `class myClass implements MyClass1, MyClass2 {}`
-*При множественной имплементации у интерфейсов не должно быть совпадающих свойств разного типа*
-
-`console.log()` - использует объект *console* для вывода информации. Для того чтобы не зависеть от логгера (*объекта console*) можно реализовать его интерфейс
-`interface ILogger {` // общая договоренность начинать имена интерфейсов с I + название класса/конструктора_объекта
-`log(...args: (string|number)[]): void;`
-`error(...args: (string|number)[]): void;`
-
-`}`
-`function func(text: string, logger: ILogger) {`
-`logger.log(text)`
-
-`}`
-`func('Petr', console)` // вместо console можно использовать любой логгер подходящий под интерфейс
-
-**Отличие типов от интерфейсов**:
-* типы поддерживают пересечение (&) и объединение (|)
-  Интерфейсы и типы можно пересекать (&) и объединять (|). При этом интерфейс трансформируется в тип:
-  `type MyType = {}`
-  `inteface MyInterface = {}`
-  `const variable: MyType && MyInterface = ''`
-* интерфейсы можно расширять с помощью **extends**:
-  `inteface Interface1 {};`
-  `inteface Interface2 extends Interface1{}`
-* интерфейсы можно имплементировать классами: `class MyClass implements MyInterface`
-  Тип можно имплементировать, но он трансформируется в интерфейс!
-  Имплементировать тип являющийся объединением нельзя
-
-
-[Вернуться к содержанию](#содержание)
-
-## 14. Дженерики
-
-**При описании используй пример из https://www.youtube.com/watch?v=-6DWwR_R4Xk 31:14**
-
-`function myFunc`**\<T\>**`(arr: T[]): T | undefined {}` // **дженерик функция**
-
-Тип параметра (\<T\>) заранее неизвестен, но вполне конкретен. Тип станет известен при передаче значения в вызове функции
-Несколько параметров: \<T, K\>
-Тип указывается перед (). Пример стрелочной функции: `<T>() => {}`, именно для стрелочной функции, чтобы не было конфликта с JSX-синтаксисом лучше писать \<T,\> с висячей запятой
-
-Вызов функции: `myFunc(['Petr', 'Ivan'])` - тип \<T\> автоматически определится как `string`
-Такой обобщенный тип не любой (any). Ему соответствует заранее неизвестный, но определенный в момент выполнения кода
-
-`interface MyInterface<T> { name: T; }` // **дженерик интерфейса**
-
-`type MyType<T> = T | undefined` // **дженерик типа**
-
-Для использования таких интерфейса или типа нужно явно указать значение дженерика:
-`type Post = { name: string, age: number }`
-`function handleResponse(response: MyInterface<Post>): MyType<Post>`
-
-`class MyClass<T> { field: T; method: (x: T, y: T) => T }` // **дженерик класса**
-
-Тип дженерика указавается явно или определяется автоматически:
-`new MyClass(0)`
-`new MyClass<number>(0)`
-
-Можно **ограничить** возможные типы дженерика:
-`type MyType<T` **extends** `string> = { name: T }`
-`type VariativeName = 'Petr' | 'Ivan'` // enum расширяется типом string
-
-`type EnumType = MyType<VariativeName>`
-`type StringType = MyType<string>`
-
-Ограничить можно определенным типами объектов (например включающими поле name):
-`type MyType = { name: string }`
-`function myFunc<T extends MyType>(data: T): T {}`
-
-Ограничить можно определенным классом и его наследниками:
-`class Parent {}`
-`class Child extends Parent {}`
-`function MyFunc<T extends Parent>(arg: T){ return arg }`
-
-`const parent = MyFunc(new Parent())` // передали и вернули класс Parent
-`const parent = MyFunc(new Child())` // передали и вернули наследуемый от класса Parent класс Child
-
-Если не использовать дженерик, а напрямую указать зависимость от класса Parent, то передавая класс наследник возвращенный тип будет Parent:
-`function myFunc(arg: Parent){ return arg }`
-`const child = myFunc(new Child())` // вернули тип класса Parent
-
-**Значения по умолчанию**
-`function myFunc<T extend string = string>(data: string): T | undefined {}`
-`myFunc('Petr')` // в этом случае тип дженерика можно не указывать явно (string | undefined)
-
-**Условные типы**
-`Current extends Base ? True : False` // Если Current наследует Base, то тип True, иначе False
-
-`type Secret<T> = T extends undefined ? null : T;` // TS проверяет каждый тип в отдельности
-`type Result = Secret<number | undefined>;` // `number | null`
-
-`type Secret<T> = T extends undefined ? null : T;` // проверяет свойства по отдельности
-`type Result = Secret<number | undefined>;` // в Result `number | null`
-
-[Вернуться к содержанию](#содержание)
-
-## 15. Файлы .d.ts
-
-Нужны для подсказок типов, используемых в обычном JS-скрипте, разработчикам и IDE
-Для установки типов для библиотеки `npm install @types/library-name --save-dev`
-Файл .d.ts называется также, как и типизируемый скрипт!
-В описании нужно описать модуль: `declare module 'my-module' {...описание типов/интерфейсов/функций и т.д.}`
-Также все описываемые типы/модули/... нужно экспортировать для использования вне файла по тем же принципам как происходит export/import в JS.
-Модули могут быть:
-* Амбиентные - используются когда нужно добавить типы для существующих переменных в глобальной области видимости
-* Глобальные - доступны глобально `declare global {}`
-* namespace - `namespace MyNamespace{ export MyType: string}` - использование в коде: `MyNamespace.MyType`
-  устаревший подход, все делается через export/import первых двух типов
-
-[Вернуться к содержанию](#содержание)
-
-## 16 Type Challenges
+Типизация Promise:
 
 ```typescript
-type MyPick<T, K extends keyof T> = {
-    [key in K]: T[key]
+type User = {
+	id: number
+	name: string
 }
 
-type MyReadonly<T> = {
-    readonly [P in keyof T]: T[P]
+function fetchData(): Promise<User> {
+	return fetch('/user')
+		.then((response) => response.json())
+		.then((data) => data as User)
 }
+```
 
-type TupleToObject<T extends readonly PropertyKey[]> = {
-     [P in T[number]]: P
+Типизация с синтаксисом  `async/await`:
+
+```typescript
+async function fetchName(): Promise<string> {
+	const response = await fetch('/name')
+	const data = await response.text()
+
+	return data
 }
+```
 
-type First<T extends unknown[]> = T extends [] ? never : T[0]
-
-type Length<T extends readonly unknown[]> = T['length']
-
-type MyExclude<T, U> = T extends U ? never : T
-
-type If<T extends Boolean, K, U> = T extends true ? K : U
-
-type Concat<T extends unknown[], K extends unknown[]> = [...T, ...K]
-
-type IsEqual<T, U> =
-  (<G>() => G extends T ? 1 : 2) extends
-  (<G>() => G extends U ? 1 : 2)
-    ? true
-    : false
-
-type Includes<T extends readonly unknown[], U> =
-  T extends readonly [infer First, ...infer Rest]
-    ? IsEqual<First, U> extends true
-      ? true
-      : Includes<Rest, U>
-    : false
-
-type Push<T extends unknown[], K> = [...T, K]
-type Unshift<T extends unknown[], U> = [U, ...T]
-
-type MyParameters<T> = T extends (...args: infer U) => any ? U : never
-
-type MyAwaited<T> = T extends PromiseLike<infer U> ? U extends PromiseLike<any> ? MyAwaited<U> : U : never
+`Awaited<T>` достает тип значения из `Promise` на уровне типов: 
+```typescript
+type ResultType = Awaited<Promise<string>> // string
+```  
+Часто `Awaited` используют вместе с `ReturnType`, чтобы получить результат async-функции: 
+```typescript
+type FetchNameResult = Awaited<ReturnType<typeof fetchName>> // string
+```  
+`Awaited` умеет разворачивать вложенные promise: 
+```typescript
+type DeepResult = Awaited<Promise<Promise<number>>>  // number
 ```
 
 [Вернуться к содержанию](#содержание)
 
-## 17. Полезные ссылки
+## 10. Дополнительные приемы типизации
+
+**keyof** - оператор, который получает union ключей объекта:
+
+```typescript
+type Person = {
+	name: string
+	age: number
+}
+
+type PersonKey = keyof Person // 'name' | 'age'
+```
+
+Используется для функция, которые принимают аргументом ключи объекта:
+
+```typescript
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+	return obj[key]
+}
+
+const person = { name: 'Petr', age: 18 }
+
+const nameValue = getProperty(person, 'name') // string
+const ageValue = getProperty(person, 'age') // number
+```
+
+**in** в типах используется как перебор ключей объекта или union-ключей:
+
+```typescript
+type Copy<T> = {
+    // `P` по очереди становится каждым ключом из `keyof T`
+	[P in keyof T]: T[P]
+}
+
+type Status = 'success' | 'error'
+
+type StatusMap = {
+   [P in Status]: boolean
+}
+
+// {
+// 	success: boolean
+// 	error: boolean
+// }
+```
+
+**infer** используется **только!** внутри conditional type и позволяет достать внутренний тип:
+
+```typescript
+type ArrayItem<T> = T extends (infer Item)[] ? Item : never
+
+type Result = ArrayItem<string[]> // string
+```
+
+Пример с объектом:
+
+```typescript
+type ObjectProperty<T> = T extends { a: infer U } ? U : never
+
+type First = ObjectProperty<{ a: string }> // string
+type Second = ObjectProperty<{ b: boolean }> // never
+```
+
+Пример с функцией:
+
+```typescript
+type MyReturnType<T> = T extends (...args: any[]) => infer R ? R : never
+
+type Result = MyReturnType<() => number> // number
+```
+
+**type guard** - проверка, после которой TypeScript сужает тип.
+
+Обычные проверки тоже являются type guard:
+
+```typescript
+function print(value: string | number) {
+	if (typeof value === 'string') {
+		return value.toUpperCase()
+	}
+
+	return value.toFixed(2)
+}
+```
+
+Кастомный type guard пишется через `value is Type`:
+
+```typescript
+type User = {
+	name: string
+}
+
+function isUser(value: unknown): value is User {
+	return typeof value === 'object' && value !== null && 'name' in value
+}
+
+function printUser(value: unknown) {
+	if (isUser(value)) {
+		console.log(value.name)
+	}
+}
+```
+
+**satisfies** проверяет, что значение подходит под тип, но не затирает более точный выведенный тип самого значения.
+
+```typescript
+type Color = 'red' | 'green' | 'blue'
+type RGB = [number, number, number]
+
+const palette = {
+	red: [255, 0, 0],
+	green: '#00ff00',
+	blue: [0, 0, 255]
+} satisfies Record<Color, string | RGB>
+
+palette.green.toUpperCase()
+```
+
+**as const** делает значение максимально узким и readonly  
+Используется, когда из обычного значения нужно получить точные литеральные типы
+
+```typescript
+const status = 'success' as const // 'success'
+const tuple = ['first', 'second'] as const // readonly ['first', 'second']
+```
+
+**typeof в типах** достает тип уже существующего значения:
+
+```typescript
+const config = {
+	apiUrl: '/api',
+	retry: 3
+}
+
+type Config = typeof config
+```
+
+**Discriminated union** - union объектов с общим полем-маркером:
+
+```typescript
+// Поле `status` позволяет вычислить какой вариант union сейчас используется.
+type Result =
+	| { status: 'success'; data: string }
+	| { status: 'error'; message: string }
+
+function handleResult(result: Result) {
+	if (result.status === 'success') {
+		return result.data
+	}
+
+	return result.message
+}
+```
+
+**Template literal types** позволяют собирать строковые типы по шаблону:
+
+```typescript
+type Method = 'get' | 'post'
+type Entity = 'User' | 'Post'
+
+type ApiMethod = `${Method}${Entity}` // 'getUser' | 'getPost' | 'postUser' | 'postPost'
+```
+
+[Вернуться к содержанию](#содержание)
+
+## 11. Рекурсия
+
+**Рекурсия в типах** - ситуация, когда тип вызывает сам себя.
+
+Пример - развернуть вложенные `Promise`:
+
+```typescript
+type MyAwaited<T> = T extends PromiseLike<infer U> ? MyAwaited<U> : T
+
+type Result = MyAwaited<Promise<Promise<string>>> // string
+```
+
+Объяснение:
+
+* `T extends PromiseLike<infer U>` - проверяем, является ли `T` promise-подобным типом.
+* `infer U` достает тип внутри `Promise`.
+* Если внутри снова `Promise`, вызываем `MyAwaited<U>` еще раз.
+* Если `Promise` больше нет, возвращаем сам `T`.
+
+Пример с массивом/кортежем - расплющить вложенные массивы:
+
+```typescript
+type Flatten<T extends unknown[]> =
+	T extends [infer First, ...infer Rest]
+		? First extends unknown[]
+			? [...Flatten<First>, ...Flatten<Rest>]
+			: [First, ...Flatten<Rest>]
+		: []
+
+type Result = Flatten<[1, [2, [3]], 4]> // [1, 2, 3, 4]
+```
+
+Разбор:
+
+* `T extends [infer First, ...infer Rest]` делит кортеж на первый элемент и остаток.
+* Если `First` тоже массив, рекурсивно раскрываем его.
+* Если `First` не массив, кладем его в результат.
+* `[]` - базовый случай, когда элементов больше нет.
+
+[Вернуться к содержанию](#содержание)
+
+## 12. Дженерики
+
+**Дженерик** - параметр типа. Используется, когда тип заранее неизвестен, но между входными и выходными данными есть связь.  
+TypeScript автоматически выводит конкретный тип при вызове функции.  
+
+Пример:
+
+```typescript
+function first<T>(arr: T[]): T | undefined {
+	return arr[0]
+}
+
+const firstName = first(['Petr', 'Ivan']) // string | undefined
+const firstNumber = first([1, 2, 3]) // number | undefined
+```
+
+Дженерик можно указать явно:
+
+```typescript
+const value = first<string>(['Petr', 'Ivan'])
+```
+
+Дженерик с несколькими параметрами:
+
+```typescript
+function pair<T, U>(first: T, second: U): [T, U] {
+	return [first, second]
+}
+
+const result = pair('id', 1) // [string, number]
+```
+
+Дженерик в стрелочной функции:
+
+```typescript
+const identity = <T,>(value: T): T => {
+	return value
+}
+```
+
+>Запятая в `<T,>` часто нужна в `.tsx`, чтобы TypeScript не спутал дженерик с JSX-тегом.
+
+Дженерик можно использовать в type и interface:
+
+```typescript
+type ApiResponse<T> = {
+	data: T
+	error?: string
+}
+
+interface Box<T> {
+	value: T
+}
+
+type User = {
+	name: string
+}
+
+const response: ApiResponse<User> = {
+	data: { name: 'Petr' }
+}
+```
+
+Можно ограничить возможные значения типа дженерика через `extends`:
+
+```typescript
+function getLength<T extends { length: number }>(value: T): number {
+	return value.length
+}
+
+getLength('text')
+getLength([1, 2, 3])
+// getLength(123) // ошибка, у number нет length
+```
+
+Пример с ключами объекта:
+
+```typescript
+function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
+	return obj[key]
+}
+
+const user = { name: 'Petr', age: 18 }
+
+getProperty(user, 'name') // string
+getProperty(user, 'age') // number
+// getProperty(user, 'email') // ошибка
+```
+
+**Значение типа по умолчанию** указывается через `=`.
+
+```typescript
+type ApiResponse<T = unknown> = {
+	data: T
+	error?: string
+}
+
+type UnknownResponse = ApiResponse
+type StringResponse = ApiResponse<string>
+```
+
+**Условные типы** часто пишутся через дженерики:
+
+```typescript
+type CurrentOrNull<T> = T extends undefined ? null : T
+
+type First = CurrentOrNull<string> // string
+type Second = CurrentOrNull<undefined> // null
+```
+
+```typescript
+type Secret<T> = T extends undefined ? null : T
+
+// union проверяется по частям
+type Result = Secret<number | undefined> // number | null
+```
+
+[Вернуться к содержанию](#содержание)
+
+## 13. Utility Type
+
+**Utility Types** - встроенные типовые операции TypeScript. 
+
+**Partial<T>** делает все свойства опциональными:
+
+```typescript
+type PartialAccount = Partial<Account>
+
+// {
+// 	login?: string
+// 	password?: string
+// 	role?: 'user' | 'admin'
+// }
+```
+
+**Required<T>** делает все свойства обязательными:
+
+```typescript
+type RequiredAccount = Required<Account>
+
+// {
+// 	login: string
+// 	password: string
+// 	role: 'user' | 'admin'
+// }
+```
+
+**Readonly<T>** делает свойства только для чтения:
+
+```typescript
+type ReadonlyAccount = Readonly<Account>
+
+const account: ReadonlyAccount = {
+	login: 'petr',
+	role: 'user'
+}
+
+// account.login = 'ivan' // ошибка
+```
+
+**Pick<T, K>** создает новый тип, выбирая только нужные поля:
+
+```typescript
+type PublicAccount = Pick<Account, 'login' | 'role'>
+
+// {
+// 	login: string
+// 	role: 'user' | 'admin'
+// }
+```
+
+**Omit<T, K>** создает новый тип, исключая указанные поля:
+
+```typescript
+type AccountWithoutPassword = Omit<Account, 'password'>
+
+// {
+// 	login: string
+// 	role: 'user' | 'admin'
+// }
+```
+
+**Record<Key, Value>** описывает объект, где набор ключей и тип значений известны заранее:
+
+```typescript
+type TrafficLight = 'green' | 'yellow' | 'red'
+
+const descriptions: Record<TrafficLight, string> = {
+	green: 'go',
+	yellow: 'wait',
+	red: 'stop'
+}
+```
+
+**Exclude<T, U>** убирает из `T` типы, которые подходят под `U`:
+
+```typescript
+type Colors = 'black' | 'white' | 'red'
+type BlackAndWhite = Exclude<Colors, 'red'> // 'black' | 'white'
+```
+
+**Extract<T, U>** оставляет из `T` только типы, которые подходят под `U`:
+
+```typescript
+type Pass = 123 | 15 | 'pass' | 'token'
+type PassNumbers = Extract<Pass, number> // 123 | 15
+```
+
+**NonNullable<T>** убирает `null` и `undefined`:
+
+```typescript
+type ApiResponse = string | undefined | null
+type ApiResponseValue = NonNullable<ApiResponse> // string
+```
+
+**Parameters<T>** достает тип параметров функции в виде кортежа:
+
+```typescript
+function getHexString(color: 'black' | 'white' | 'red'): string {
+	if (color === 'black') return '#000'
+	return '#fff'
+}
+
+type Params = Parameters<typeof getHexString> // ['black' | 'white' | 'red']
+type Color = Params[0] // 'black' | 'white' | 'red'
+```
+
+**ReturnType<T>** достает тип возвращаемого значения функции:
+
+```typescript
+type Hex = ReturnType<typeof getHexString> // string
+```
+
+**Awaited<T>** достает тип результата из `Promise`:
+
+```typescript
+type Result = Awaited<Promise<string>> // string
+type DeepResult = Awaited<Promise<Promise<number>>> // number
+```
+
+[Вернуться к содержанию](#содержание)
+
+## 14. Файлы .d.ts
+
+`.d.ts` - файл с описанием типов без реализации.  
+Нужен, когда JavaScript-код уже есть, а TypeScript должен понимать его типы.
+
+Для популярных библиотек типы обычно ставятся отдельно:
+
+```bash
+npm install --save-dev @types/library-name
+```
+
+Глобальные типы добавляются через `declare global`:
+
+```typescript
+declare global {
+	interface Window {
+		appVersion: string
+	}
+}
+
+export {}
+```
+
+`export {}` в конце нужен, чтобы файл считался модулем, а `declare global` корректно расширял глобальные типы.
+
+[Вернуться к содержанию](#содержание)
+
+## 15. Кастомные типы
+
+Примеры кастомных типов из [Type Challenges](https://github.com/type-challenges/type-challenges). Практика для TS
+
+**MyPick** - выбирает из объекта только указанные ключи:
+
+```typescript
+type MyPick<T, K extends keyof T> = {
+	[P in K]: T[P]
+}
+```
+
+* `K extends keyof T` - `K` может быть только ключом объекта `T`.
+* `[P in K]` - перебираем переданные ключи.
+* `T[P]` - берем тип значения по текущему ключу.
+
+**MyReadonly** - делает все свойства объекта readonly:
+
+```typescript
+type MyReadonly<T> = {
+	readonly [P in keyof T]: T[P]
+}
+```
+
+`readonly` ставится перед ключом в mapped type.
+
+**TupleToObject** - превращает кортеж значений в объект:
+
+```typescript
+const tuple = ['tesla', 'model 3', 'model X'] as const
+
+type TupleToObject<T extends readonly PropertyKey[]> = {
+	[P in T[number]]: P
+}
+
+type Result = TupleToObject<typeof tuple>
+// {
+// 	tesla: 'tesla'
+// 	'model 3': 'model 3'
+// 	'model X': 'model X'
+// }
+```
+
+* `as const` превращает массив в readonly-кортеж с литеральными типами.
+* `PropertyKey` - встроенный тип для ключей объекта: `string | number | symbol`.
+* `T[number]` достает union всех значений массива или кортежа.
+* `[P in T[number]]` перебирает эти значения и делает их ключами объекта.
+
+**First** - достает первый элемент кортежа:
+
+```typescript
+type First<T extends readonly unknown[]> = T extends [] ? never : T[0]
+```
+
+Если кортеж пустой, возвращаем `never`. Иначе берем элемент по индексу `0`.
+
+**Length** - достает длину кортежа:
+
+```typescript
+type Length<T extends readonly unknown[]> = T['length']
+```
+
+У кортежа `length` может быть конкретным числом:
+
+```typescript
+type Result = Length<readonly ['a', 'b']> // 2
+```
+
+**MyExclude** - убирает из union те типы, которые подходят под `U`:
+
+```typescript
+type MyExclude<T, U> = T extends U ? never : T
+
+type Result = MyExclude<'a' | 'b' | 'c', 'a'> // 'b' | 'c'
+```
+
+Так работает из-за distributive conditional types: union слева проверяется по частям.
+
+**If** - выбирает один из двух типов по boolean-условию:
+
+```typescript
+type If<C extends boolean, T, F> = C extends true ? T : F
+
+type Result = If<true, 'yes', 'no'> // 'yes'
+```
+
+`C extends boolean` ограничивает первый аргумент только `true` или `false`.
+
+**Concat** - соединяет два кортежа:
+
+```typescript
+type Concat<T extends readonly unknown[], U extends readonly unknown[]> = [...T, ...U]
+
+type Result = Concat<[1, 2], [3, 4]> // [1, 2, 3, 4]
+```
+
+`...T` и `...U` здесь работают на уровне типов, как spread у массивов в JavaScript.
+
+**Includes** - проверяет, есть ли тип в кортеже:
+
+```typescript
+type IsEqual<T, U> =
+	(<G>() => G extends T ? 1 : 2) extends
+	(<G>() => G extends U ? 1 : 2)
+		? true
+		: false
+
+type Includes<T extends readonly unknown[], U> =
+	T extends readonly [infer First, ...infer Rest]
+		? IsEqual<First, U> extends true
+			? true
+			: Includes<Rest, U>
+		: false
+```
+
+`IsEqual` выглядит странно, но смысл простой: он сравнивает два типа именно на равенство, а не просто через `extends`.
+
+В `Includes` используется рекурсия:
+
+* `infer First` достает первый элемент.
+* `infer Rest` достает остаток кортежа.
+* Если `First` равен `U`, возвращаем `true`.
+* Если нет, запускаем `Includes<Rest, U>`.
+* Если элементы закончились, возвращаем `false`.
+
+**Push** и **Unshift** - добавляют элемент в конец или начало кортежа:
+
+```typescript
+type Push<T extends readonly unknown[], U> = [...T, U]
+type Unshift<T extends readonly unknown[], U> = [U, ...T]
+
+type First = Push<[1, 2], 3> // [1, 2, 3]
+type Second = Unshift<[1, 2], 0> // [0, 1, 2]
+```
+
+**MyParameters** - достает параметры функции в виде кортежа:
+
+```typescript
+type MyParameters<T extends (...args: any[]) => any> =
+	T extends (...args: infer P) => any ? P : never
+
+type Result = MyParameters<(name: string, age: number) => void>
+// [name: string, age: number]
+```
+
+`infer P` достает тип rest-параметров функции.
+
+**MyAwaited** - достает тип из `Promise`, включая вложенные promise:
+
+```typescript
+type MyAwaited<T extends PromiseLike<any>> =
+	T extends PromiseLike<infer U>
+		? U extends PromiseLike<any>
+			? MyAwaited<U>
+			: U
+		: never
+
+type Result = MyAwaited<Promise<Promise<string>>> // string
+```
+
+Здесь вместе работают `infer` и рекурсия: достаем внутренний тип, проверяем его еще раз и повторяем, пока внутри не останется обычное значение.
+
+[Вернуться к содержанию](#содержание)
+
+## 16. Полезные ссылки
 
 [Еще раз очень подробно о Typescript](https://www.youtube.com/watch?v=LWtHl__oEWc)  
 [Типизация React/Axios/Redux](https://www.youtube.com/watch?v=ApIStAZa8Vc)
