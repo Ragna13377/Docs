@@ -354,16 +354,27 @@ class ConsoleLogger implements Logger {
 ```
 
 **Отличия `type` от `interface`:**
-
-* `type` поддерживает объединение (`|`) и пересечение (`&`)
-Интерфейсы и типы можно пересекать и объединять. При этом интерфейс трансформируется в тип.
-* `interface` можно расширять через `extends`
-* `interface` можно использовать в классе через `implements`
-Тип можно имплементировать, но он трансформируется в интерфейс
->При этом имплементировать тип являющийся объединением нельзя
-
-* `type` нельзя объявить повторно с тем же именем
-* `interface` можно объявить несколько раз, и объявления объединятся
+* `type` может описывать любой тип: примитив, объект, функцию, tuple, union, intersection и т.д. 
+* `interface` используется для описания объектных типов и контрактов классов;
+* `interface` расширяется через `extends`: `interface Employee extends User { role: string }`
+* `type` комбинируется через и пересечение (`&`): `type Employee = User & { role: string }`
+* `type` может напрямую объявлять union (`|`): `type Result = Success | Error`
+* `interface` union объявить не может.
+* `interface`, и объектный `type` можно использовать через implements  
+```typescript
+interface Logger { 
+  log(message: string): void 
+} 
+type Serializable = { 
+  serialize(): string 
+} 
+class Service implements Logger, Serializable { 
+  log(message: string): void {} 
+  serialize(): string { return '' } 
+}
+```
+* `type` нельзя повторно объявить с тем же именем
+* `interface` можно объявить несколько раз с одним именем - объявления объединятся (declaration merging):
 ```typescript
 // WindowState будет содержать оба поля
 interface WindowState {
@@ -638,7 +649,12 @@ type User = {
 }
 
 function isUser(value: unknown): value is User {
-	return typeof value === 'object' && value !== null && 'name' in value
+	return ( 
+      typeof value === 'object' &&
+      value !== null &&
+      'name' in value &&
+      typeof value.name === 'string'
+  )
 }
 
 function printUser(value: unknown) {
@@ -1071,7 +1087,7 @@ type Result = TupleToObject<typeof tuple>
 **First** - достает первый элемент кортежа:
 
 ```typescript
-type First<T extends readonly unknown[]> = T extends [] ? never : T[0]
+type First<T extends readonly unknown[]> = T extends readonly [infer First, ...unknown[]] ? First : never
 ```
 
 Если кортеж пустой, возвращаем `never`. Иначе берем элемент по индексу `0`.

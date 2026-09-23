@@ -93,7 +93,7 @@ const a = 1;
 func()
 ```
 
->При создании переменной без `var, let, const` - она будет создана в глобальной области видимости, даже если объявлена внутри функции  
+>При создании переменной без `var, let, const` - она будет создана в глобальной области видимости, даже если объявлена внутри функции. В strict mode - ReferenceError  
 `function myFunction () { a = 10 }`
 
 [Вернуться к содержанию](#содержание)
@@ -151,9 +151,8 @@ labelName: for() {
 }
 ```
 
-* `for..of` - цикл обхода перечисляемых свойств итерируемой сущности  
-К итерируемым сущностям относятнся: _массив, строка, NodeList, HTMLCollection, Map, Set, генератор, arguments функции и т.д._    
-Обход осуществляется по значениям элементов  
+* `for..of` - цикл обхода значений итерируемой сущности  
+К итерируемым сущностям относятнся: _массив, строка, NodeList, HTMLCollection, Map, Set, генератор, arguments функции и т.д._     
 Для одновременного доступа к паре ключ-значение используется деструктуризация:  
  `for (let [key, value] of array) {}`  
  
@@ -166,7 +165,7 @@ for (const value of array) {
 }
 ```
 * `for..in` - цикл обхода по ключам перечисляемых свойств объекта, в том числе по перечисляемым свойствам прототипов объекта.  
-_Исключения из перечисления:_ Symbol, поля с флагом iterable = false, встроенные свойства (length, toString и т.д.)  
+_Исключения из перечисления:_ Symbol, свойства с enumerable = false, встроенные свойства (length, toString и т.д.)  
 При одинаковых свойствах в цепочке прототипов учитывается только первое из них  
 Порядок перечисления в объекте не регламентирован. Один из частых вариантов: числовые значения в порядке возрастания, строковые в порядке присвоения объекту  
 Не рекомендуется применять к массивам, т.к. переменная цикла будет иметь тип `string` и в перечисление попадут наследуемые и строковые свойства  
@@ -194,7 +193,7 @@ _Исключения из перечисления:_ Symbol, поля с фла
 **Работа со строками:**  
 * `str.at(index)` - возвращает символ строки по указанному индексу (отрицательный индекс начинает отсчет с конца строки)
 * `str.startsWith(searchString[, position])` - возвращает boolean. Начинается ли строка с указанных символов, начиная с начала(или с заданной позиции)
-* `string.endWith(searchString[, position])` - возвращает boolean. Заканчивается ли строка на указанные символы (обрезая по указанному диапазону)
+* `string.endsWith(searchString[, position])` - возвращает boolean. Заканчивается ли строка на указанные символы (обрезая по указанному диапазону)
 * `str.includes(searchString[, position])` - возвращает boolean. Cодержит ли строка заданную подстроку, начиная с начала (или с заданной позиции)
 * `str.indexOf(searchValue, [fromIndex])` - возвращает индекс первого вхождения указанного значения, начиная от начала к концу (с индекса fromIndex). -1, если не найдено
 * `str.search([regexp])` - аналогично indexOf с возможностью передать regExp
@@ -217,7 +216,7 @@ console.log(arrayMatchAll[1]); // Array ["test2", "e", "st2", "2"]
 * `str.trimStart()`, `str.trimEnd()`, `str.trim()` - удаляет пробельные символы (в том числе табуляция, nbsp и т.д.) с начала/конца/с обеих сторон строки
 * `str.padStart(targetLength [, padString])`, `str.padEnd(targetLength [, padString])` - дополняет строку с начала/конца с помощью заданной до укананной длины
 * `str.repeat(count)` - повторяет строку указанное количество раз
-* `str.replace(regexp|substr, newSubStr|function[, regexpFlags])` - возвращает новую строку с заменой первого совпадения из первого параметра на второй. Примеры передачи строки в [MDN](https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/String/replace)
+* `str.replace(regexp|substr, newSubStr|function)` - возвращает новую строку с заменой первого совпадения из первого параметра на второй. Примеры передачи строки в [MDN](https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/String/replace)
 * `str.replaceAll(regexp|substr, newSubstr|function)` - возвращает новую строку с заменой всех совпадений из первого параметра на второе
 
 В пользовательском вводе могут использоваться emoji, так как они входят в состав кодировки, длина которых не всегда равна одному визуальному символу.  
@@ -337,7 +336,7 @@ Object.is(-0, 0); // -> false
 `+str`, `Number(str)` - приведение к числовому типу  
 >**НО** `Number('4a')` - NaN, `+'4a'` - NaN, `parseInt('4a')` - 4, `Number.parseInt('4a')` - 4  
 По умолчанию аргументом `Number` является `0`, а не `undefined`, поэтому `Number(); // -> 0`, `Number(undefined); // -> NaN`
-* `numObj.toFixed([digits])` - возвращает **строку** с заданной точностью `digits` (без параметра - отбрасывает дробную часть без округления, с параметром - округляет)  
+* `numObj.toFixed([digits])` - возвращает **строку** с заданной точностью `digits` (по умолчанию 0).  
 * `numObj.toPrecision([precision])` - возвращает **строку** с заданной точностью `precision`  
 **Отличие toFixed от toPrecision**: в `toFixed` передается число знаков после запятой, а *toPrecision* - общее число знаков  
 ```javascript
@@ -352,7 +351,7 @@ variable.toPrecision(2) // 12
 ### BigInt  
 
 Способы создания: `123n` иди `BigInt(123)`  
-Используется для больших чисел и чисел высокой точности (2^53 - 1)  
+Используется для целых чисел произвольной точности, в частности для целых значений за пределами `Number.MAX_SAFE_INTEGER`  
 В операциях деления **отбрасывается дробная часть!**  
 >Нельзя оперировать одновременно с `BigInt` и `Nubmer` - нужно явное приведение типов  
 `let a = 10, b = 10n // a !== b`  
@@ -373,14 +372,18 @@ variable.toPrecision(2) // 12
 * результат обращения к несуществующему свойству объекта
 * и т.д.  
 
-**Null** - используется для обозначения объекта с неопределенной структурой, намеренного отсутствия значения переменной 
+**Null** - используется для обозначения намеренного отсутствия значения/объекта 
 
 [Вернуться к содержанию](#содержание)
 
 ### 4.4 Symbol
 
 Примитивный тип данных, создается через функцию `Symbol([description])`.  
-Символ создает скрытые свойства в объекте, которые не выводятся через `Object.keys(obj)`, `for..in`, но к ним можно обратиться по имени:      
+Symbol можно использовать как уникальный ключ свойства объекта.  
+
+>Свойства с Symbol-ключами не перечисляются через Object.keys() и for..in, но доступны через Object.getOwnPropertySymbols() и Reflect.ownKeys().
+
+Также к символам можно обратиться по имени:      
 ```javascript
 let id = Symbol('id') 
 const obj = {[id]: 'dog' }  // свойство-символ внутри объекта обязательно записывается через []
@@ -429,7 +432,9 @@ console.log('a-b-c'.split(new MySplitter())); // ['[a]', '[b]', '[c]']
 * `{}` - `'[object Object]'`  
 * остальные преобразуются как записаны, например `123` - `'123'`, null - 'null'
 
-**Числовое преобразование** неявное: `*, /, -, (унарный плюс), <, >, <=, >=, ==, +(если оба аргумента не строки)`
+**Числовое преобразование** неявное: `*, /, -, (унарный плюс), +(если оба аргумента не строки)`  
+Для `<, >, <=, >=`: если оба операнда строки - они сравниваются как строки; иначе выполняется числовое сравнение с приведением типов.  
+Нестрогое равенство `==` использует отдельные правила приведения типов в зависимости от типов операндов.  
 * `true` - 1  
 * `false` - 0  
 * `null` - 0  
@@ -451,7 +456,7 @@ console.log('a-b-c'.split(new MySplitter())); // ['[a]', '[b]', '[c]']
 [таблица нестрогого равенство](https://doka.guide/js/typecasting/images/1-1200w.webp)  
 [странности неявных преобразований](https://github.com/denysdovhan/wtfjs)  
 
->null **строго равен ТОЛЬКО undefined и самому себе.**   
+>null **строго равен ТОЛЬКО самому себе и не строго равен undefined.**   
 Аналогично для undefined: `null == undefined // true`  
 Поэтому `null == 0 // false`, `undefined == 0 // false`  
 другие типы сравнений валидны: `null >= 0; // -> true`
@@ -515,7 +520,7 @@ false == ![]; // -> true
 ```javascript
 function func(args) {...код}
 ```
-* function expression (анонимная, стрелочная), является выражением, поэтому должна быть присвоена переменной  
+* function expression (анонимная, стрелочная), является выражением и может быть присвоена переменной, передана аргументом, сразу вызвана и т.д.  
 	* Анонимная функция - используется, когда функцию не собираются использовать многократно
 	* Стрелочная функция - упрощенная запись анонимной функции
 ```javascript
@@ -559,8 +564,8 @@ function func2(){}
 func(func1, func2) 
 ```
 
-**Рекурсия** - вызов функции внутри самой себя, но это должно быть оправдано, так как сложность алгоритма рекурсии самое времязатратное  
-Любая рекурсия содержит _базовый случай_ для прекращения самой рекурсии. Для уменьшения ресурсозатрат можно мемоизировать рекурсивные значения  
+**Рекурсия** - вызов функции самой себя. Рекурсивные вызовы используют call stack и имеют дополнительные расходы на вызов функций; слишком глубокая рекурсия может привести к переполнению стека.  
+Любая рекурсия содержит _базовый случай_ для прекращения самой рекурсии. Если при рекурсии повторно вычисляются одинаковые подзадачи, их результаты можно мемоизировать.  
 
 Мемоизация на примере функции Хофстедера: `Q(1) = Q(2) = 1; Q(n) = Q(n - Q(n - 1)) + Q(n - Q(n - 2))`  
 Использовано каррирование (разделение передаваемых аргументов) и IIFE для передачи значений первых двух элементов
@@ -572,7 +577,7 @@ const hofstadterQ = (cache => n => {
    return cache[n];
 })({1: 1, 2: 1});
 ```
-Рекурсия может быть переписана через цикл, скорость выполнения увеличится, но код может стать менее читаемым  
+Рекурсию во многих случаях можно переписать через цикл, уменьшив использование call stack и накладные расходы на вызовы функций, но это не гарантирует увеличение скорости и само по себе не изменяет алгоритмическую сложность.    
 ```javascript
 const hofstadterQ = n => {
 	const res = [1, 1];
@@ -601,7 +606,7 @@ const hofstadterQ = n => {
 * Стрелочные функции не имеют собственного контекста (`this`) и берут его из внешней области видимости.  
   Если стрелочная функция создана на верхнем уровне обычного браузерного скрипта, `this` будет ссылаться на `window`.
 
->При любом количестве вложенных друг в друга стрелочных функциях они будут ссылаться на контекст самого верхнего уровня.  
+>При любом количестве вложенных друг в друга стрелочных функций они используют this ближайшего внешнего контекста, в котором есть собственный this.  
 Если функция самого верхнего уровня - стрелочная, то все ссылаются на глобальный контекст, если анонимная/обычная, то на их контекст.  
 `this` вложенных обычных/анонимных функций **не привязан** к родительскому объекту (можно явно задать контекст через `bind`)  
 
@@ -781,10 +786,16 @@ stepper1.show() // 1
 const add = a => b => c => a + b + c;
 const result = add(1)(2)(3);
 ```
-Свойство `length` возвращает количество аргументов функции:
+Свойство function.length возвращает количество ожидаемых формальных параметров функции: учитываются параметры только до первого параметра со значением по умолчанию, а rest-параметр не учитывается.:
 ```javascript
-const myFunc = function(a, b){}
-console.log(myFunc.length) // 2
+function a(x, y) {}
+a.length // 2
+
+function b(x, y = 1, z) {}
+b.length // 1
+
+function c(...args) {}
+c.length // 0
 ```
 **Задача: создать функцию каррирования**
 ```javascript
@@ -824,7 +835,7 @@ function carry(fn) {
 * `Array.isArray(obj)` - возвращает boolean, проверка является ли переданный объект массивом(т.к. `typeof arr // 'object'`).  
 **Альтернативная проверка** *`arr instanceof Array`* (принадлежность глобальному классу Array)  
 Типизированные массивы возвращают false  
-* `Array.from(arrayLike[, mapFn(element[, index[, array]]) { ... }[, thisArg]])` - **создает массив** из массивоподобного или итерируемого объекта (строка, NodeList. HTMLCollection, Set, Map и т.д.)    
+* `Array.from(arrayLike[, mapFn(element[, index]) { ... }[, thisArg]])` - **создает массив** из массивоподобного или итерируемого объекта (строка, NodeList. HTMLCollection, Set, Map и т.д.)    
 Передаваемый "объект" должен обладать одним из двух свойств: 1) элементы должны быть проиндексированы и иметь свойство length; 2) реализован Iterable интерфейс  
 При создании массива происходит поверхностное копирование  
 Вместо последовательного вызова Array.from(arr).map() в качестве второго аргумента можно передать колбек-map-функции, т.о. исключается создавание промежуточного массива  
@@ -868,62 +879,15 @@ function* makeIterableOfPromises() {
 ```
 
 ```javascript
-const wait = (ms) => new Promise((res) => setTimeout(() => res(ms), ms)
+const wait = (ms) => new Promise((res) => setTimeout(() => res(ms), ms))
 const promises = [wait(1000), wait(2000), wait(3000)]
 
-const result = await Array.from(promises, (el) => element * 2)
+const result = await Array.from(promises, (el) => el * 2)
 console.log(result) // [Promise, Promise, Promise]  
 
 const resultAsync = await Array.fromAsync(promises, (el) => element * 2)
 console.log(resultAsync) // [2000, 4000, 6000]
 ```
-
-> `Array.fromAsync()` не всегда корректно закрывает `sync iterable`, если ошибка возникает во время `await` значения, а не во время самой итерации.
-
-<details>
-	<summary>Пример</summary>
-
-```js
-function* numbers() {
-  try {
-    // generator `numbers()` возвращает `Promise`
-    yield Promise.resolve(1);
-    // второй `Promise` завершается с ошибкой
-    yield Promise.reject(new Error("Error"));
-  // finally внутри generator не выполняется
-  } finally {
-    console.log("generator closed");
-  }
-}
-
-(async () => {
-  try {
-    await Array.fromAsync(numbers());
-  } catch (error) {
-    // `Array.fromAsync()` пробрасывает ошибку, но не вызывает закрытие исходного iterator
-    console.log("caught:", error.message);
-  }
-})();
-
-// caught: Error
-// "generator closed" не выведется
-
-// При ручном `for...of` + `await` generator закрывается корректно, поэтому `finally` выполняется.
-(async () => {
-  const result = [];
-
-  try {
-    for (const value of numbers()) {
-      result.push(await value);
-    }
-  } catch (error) {
-    console.log("caught:", error.message);
-  }
-})();
-// generator closed
-// caught: Error
-```
-</details>
 
 [Array.fromAsync на видео](https://www.youtube.com/watch?v=7fTMx6QaFpY)  
 
@@ -966,7 +930,7 @@ function* numbers() {
 * `array.splice(start[, deleteCount[, item1[, item2[, ...]]]])` - возвращает массив удаленных элементов. Исходный массив **мутирует** - удаляется целое число `deleteCount` элементов и вставляются новые элементы `item1...N`, начиная с индекса `start`  
 * `array.toSpliced(start[, deleteCount[, item1[, item2[, ...]]]])` - аналог `splice`. Возвращает **новый измененный массив**, не мутирует исходный  
 >При вызове метода преобразует все пустые элементы в undefined
-* `arr.sort(compareFunction(a,b){})` - возвращает отсортированный **исходный массив**. `compareFunction` - должна возвращать значения: `>0`(a перед b), `0`(без изменений), `<0`(b перед a)  
+* `arr.sort(compareFunction(a,b){})` - возвращает отсортированный **исходный массив**. `compareFunction` - должна возвращать значения: `<0`(a перед b), `0`(без изменений), `>0`(b перед a)  
 >undefined не сравниваются `compareFunction` и попадают в конец массива
 * `arr.toSorted(compareFunction(a,b){})` - аналог `sort`. Возвращает **новый измененный массив**, не мутирует исходный 
 * `array.reverse()` - возвращает **исходный массив** с обратным порядком следования элементов  
@@ -984,7 +948,7 @@ _Отличие от `map`:_ `forEach` возвращает void, поэтому
 * `array.reduce(callbackFn(accumulator, element[, index[, array]]){return ... код}[, startValue])` - **возвращает одно значение** `accumulator`, как результат выполнения колбек функции над каждым элементом исходного массива  
 Колбек-функция всегда **должна возвращать результат**, который станет значением `accumulator` в новой итерации  
 `startValue` - начальное значение `accumulator` (по умолчанию: первый элемент массива). Рекомендуется указывать всегда для исключения ошибки при передаче пустого массива
->Если необходимо вернуть массив или объект, то начальное значение задавать **обязательно** (вид начального значения: `[] или {}`)  
+>Если accumulator должен быть массивом или объектом, обычно передают соответствующее начальное значение [] / {}. Без initialValue первым accumulator становится первый элемент массива, а для пустого массива возникнет ошибка.  
 * `array.reduceRight(callbackFn(accumulator, element[, index[, array]]){return ... код}[, startValue])` - аналог `reduce`, но вычисления идут справа налево  
 
 [Скорость выполнения](https://www.measurethat.net/Benchmarks/Show/26792/0/performance-of-javascript-foreach-map-and-reduce-vs-for)  
@@ -1038,7 +1002,7 @@ JS-движок автоматически контролирует выделе
 **ArrayBuffer** - создает объект **байтов** в памяти заданной длинны. Его содержимое нельзя напрямую изменить.  
 ```javascript
 const buffer = new ArrayBuffer(length, options)
-instanceof buffer // ArrayBuffer  
+buffer instanceof ArrayBuffer // true 
 ```
 Свойства: 
 * buffer.detached - определяет был ли буфер перемещен (transfered) (boolean)  
@@ -1056,7 +1020,7 @@ instanceof buffer // ArrayBuffer
 Длина не может быть больше `maxByteLength`  
 * `buffer.transferToFixedLength(newByteLength)` - аналог `transfer`, но создает НЕ-изменяемый буфер `newByteLength` может быть больше `maxByteLength`  
 
-**DataView** - разбивает данные (поток нулей и единиц) из ArrayBuffer на блоки  
+**DataView** - представление над ArrayBuffer, позволяющее читать и записывать значения разных числовых типов по заданному byte offset и явно управлять порядком байтов (endianness).  
 `const view = new DataView(buffer, byteOffset, byteLength)`  
 
 Свойства (только для чтения):  
@@ -1088,7 +1052,8 @@ function myMap<T, U>(arr: T[], cb: MapFunction<T, U>): U[] {
 [Работа с keys, values, entries, enumerable](https://www.youtube.com/watch?v=Ha2geO5Qw_Q)  
 [Очень коротко, основные фишки](https://www.youtube.com/watch?v=NsLJ_GBU-A4)  
 
-Создание полей (в качестве ключей может быть только тип string, остальные типы неявно приводятся (`{ [{}]: {} } // -> { '[object Object]': {} }`):  
+Создание полей (в качестве ключей может быть только тип string или Symbol.  
+Остальные значения при использовании как property key приводятся к строке. (`{ [{}]: {} } // -> { '[object Object]': {} }`):  
 ```javascript
 obj = { 
 	name, // упрощенное создание свойства, когда ключ и значение совпадают (name: 'name')  
@@ -1123,8 +1088,8 @@ obj['age']
 Удаление свойства:
 ```javascript
 delete obj.name  
-delete obj.[variable] // let variable = 'city' 
-delete obj.['age']
+delete obj[variable] // let variable = 'city' 
+delete obj['age']
 ```
 
 Массивы и функции являются объектами, поэтому могут иметь **именованные свойства**:  
@@ -1132,8 +1097,10 @@ delete obj.['age']
 const arr = [];  
 arr.name = 'Petr'
 
-function myFunc(){};  
-func.name = 'Petr' // наличие таких свойств у функции не нарушает ее выполнение  
+function myFunc(){};
+myFunc.customName = 'Petr'
+myFunc.customName // 'Petr'
+// наличие таких свойств у функции не нарушает ее выполнение   
 ```  
 Для **скрытия свойств** в объекте можно воспользоваться Symbol:  
 Свойства заданные через Symbol скрыты от циклов и методов: `for..in, Object.keys, Object.values, Object.entries, getOwnProperty`  
@@ -1150,9 +1117,11 @@ let obj = {[variable]: 'Petr'}
 * `Object.keys(obj)` - возвращает **массив** ключей перечисляемых **собственных (не прототипа) свойств** объекта  
 * `Object.entries(obj)` - возвращает **массив** пар ключ-значение перечисляемых **собственных (не прототипа) свойств** объекта  
 * `Object.fromEntries(iterable)` - возвращает объект на основе списка пар ключ-значение. `Object.fromEntries([['name', 'Petr'],['age', 18]])`  
-Аргумент - объект реализующий Iterable интерфейс (Map, Set и т.д.)  
-* `Object.toString()` - возвращает строковое предсавление объекта (стандартно Object[object])
-Можно переопределить через `Symbol.toPrimitive`, `prototype.toString` или в самом классе/конструкторе
+Аргумент — iterable, выдающий пары [key, value], например Map или массив пар.  
+* `Object.toString()` - возвращает строковое предсавление объекта  
+Для обычного объекта по умолчанию: `"[object Object]"`.  
+Метод toString можно переопределить в самом объекте или его прототипе.
+  Object.prototype.toString.call(value) - позволяет получить стандартный type tag значения, например `"[object Array]"`, `"[object Date]"`  
 * `'property' in obj` - наличие свойства `property` в объекте **и его прототипе**  
 * `obj.hasOwnProperty(prop)` - наличие свойства в объекте, **но не в прототипе**  
 * `Object.hasOwn(obj, prop)` - аналог устаревшего `hasOwnProperties`  
@@ -1160,18 +1129,18 @@ let obj = {[variable]: 'Petr'}
 const obj = { name: 'Petr'}  
 'name' in obj // true  
 Object.hasOwn(obj, 'name') // true  
-obj.hasOwnProperty(obj, 'name') // true  
+obj.hasOwnProperty('name')// true  
 
 const obj = { name: 'Petr'}   
 'toString' in obj // true  
 Object.hasOwn(obj, 'toString') // false  
-obj.hasOwnProperty(obj, 'toString') // false  
+obj.hasOwnProperty('toString') // false  
 
 const obj = Object.create(null)  
 obj.age = 21  
 'age' in obj // true  
 Object.hasOwn(obj, 'age') // true  
-obj.hasOwnProperty(obj, 'age') // false  
+obj.hasOwnProperty('age') // false  
 ```
 [Отличие hasOwn от hasOwnProperty (vpn)](https://javascript.plainenglish.io/in-vs-hasown-vs-hasownproperty-in-javascript-885771d2d100)  
 [Отличие hasOwn от hasOwnProperty на русском](https://www.dev-notes.ru/articles/javascript/check-if-a-object-property-exists/)  
@@ -1206,7 +1175,8 @@ const groupedByAge = Object.groupBy(persons, ({age}) =>  age < 18 ? 'young' : 'o
 
 Отличие первых двух методов копирования:
 * Количество кода
-* Spread не копирует прототип исходного объекта в целевой объект, а Object.assign сохраняет прототип  
+* `Spread` и `Object.assign({}, source)` не копируют прототип source - результатом будет обычный объект с Object.prototype.
+* `Object.assign(target, source)` мутирует и возвращает существующий target, поэтому его исходный прототип сохраняется.  
 
 **Пример 1**  
 ```javascript
@@ -1305,7 +1275,7 @@ const person = {
 * `Object.isFrozen(obj)` - определяет применен ли к объекту `freeze` (boolean)  
 
 * `Object.getOwnPropertyDescriptor(obj, prop)` - возвращает дескриптор собственного свойства  
-* `Object.getOwnPropertyDescriptors(obj)` - возвращает массив дескрипторов всех собственных свойств (независимо от того перечисляемые они или нет) 
+* `Object.getOwnPropertyDescriptors(obj)` - возвращает объект дескрипторов всех собственных свойств (независимо от того перечисляемые они или нет) 
 * `Object.getOwnPropertyNames(obj)` - возвращает массив строк, содержащих имена собственных свойств
 * `Object.getOwnPropertySymbols(obj)` - возвращает массив всех собственных символьных свойств объекта 
 >Единственный из 4 методов, который возвращает Symbol
@@ -1331,9 +1301,18 @@ Object.create(obj.prototype, {
 * `Object.setPrototypeOf(obj, prototype)` - переопределение прототипа объекта  
 Переопределение прототипа сильно влияет на производительность  
 *Можно получить/переопределить прототип через встроенное свойство `obj.__proto__` , но способ устаревший*  
-* `obj instanceOf NewObject` - проверка принадлежности к функции конструктору [5.1 Контекст функции](#51-контекст-функции)    
-* `prototypeObj.isPrototypeOf(object)` - проверяет является ли объект прототипом для другого объекта (создание через Object.create)  
->**Отличие от instanseof**: isPrototypeOf - проверяет прототип, а не класс/конструктор. Проверка объекта созданного через `Object.create` способом `instanseof` выдаст **ошибку**  
+* `obj instanceOf NewObject` - проверяет, находится ли `NewObject.prototype` в цепочке прототипов объекта `obj`. [5.1 Контекст функции](#51-контекст-функции)    
+* `prototypeObj.isPrototypeOf(object)` - проверяет, находится ли конкретный объект `prototypeObj` в цепочке прототипов `obj` (создание через Object.create)  
+>**Отличие от instanseof**: `instanceof` использует `prototype` функции-конструктора, а `isPrototypeOf` проверяет непосредственно переданный объект-прототип.  
+> Объект, созданный через `Object.create(Constructor.prototype)`, будет успешно проходить проверку `instanceof Constructor`.  
+```javascript
+function User() {}
+
+const obj = Object.create(User.prototype)
+
+obj instanceof User // true
+User.prototype.isPrototypeOf(obj) // true
+```
 
 [Вернуться к содержанию](#содержание)
 

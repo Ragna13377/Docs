@@ -12,7 +12,7 @@
 
 Установка: `npm install axios`  
 
-Для получения типизации в CommonJS: `const axios = require('axios').default;`  
+Для получения типизации в CommonJS: `const axios = require('axios');`  
 [Разбор Axios](https://www.youtube.com/watch?v=ltn9QoBCJkU)  
 
 Установка для мокирования: `npm install axios-mock-adapter --save-dev`  
@@ -20,11 +20,13 @@
 [Очень коротко про мокирование Axios](https://www.youtube.com/watch?v=upM6p0eIdw8)  
 [Документация на ГХ](https://github.com/ctimmerm/axios-mock-adapter)  
 
->**Офтоп**
-На момент написания были серьезные проблемы с использованием MSW в Next 13 App Router для server-side mocking [пруф 1](https://x.com/kettanaito/status/1749496339556094316), [пруф 2](https://github.com/mswjs/msw/issues/1644)  
-Axios-mock-adapter работает только с axios запросами.  
-React Query (поддерживает fetch и axios) имеет встроенные обертки над запросами (отмена запроса, статус pending, повторный запрос и т.д.).  
-В Next встроено кэширование для fetch запросов. Для axios автоматическое кэширование не поддерживается, но можно использовать `cache` из React в серверных сценариях.  
+>**Офтоп**  
+В Next 13 App Router были проблемы с server-side mocking через MSW из-за устройства серверных процессов Next.  
+Сейчас MSW можно подключать на сервере через msw/node + instrumentation.js; для клиентских запросов по-прежнему используется Service Worker.  
+fetch на сервере дополнительно интегрирован с механизмами Next (cache, revalidation и т.д.), Axios этой интеграции автоматически не получает.  
+Поэтому на сервере Next обычно удобнее fetch, а на клиенте можно использовать как fetch, так и Axios.
+[пруф 1](https://github.com/mswjs/msw/discussions/2137?utm_source=chatgpt.com), [пруф 2](https://nextjs.org/blog/next-15?utm_source=chatgpt.com)  
+~~Проблемы с MSW в Next 13 App Router для server-side mocking [пруф 1](https://x.com/kettanaito/status/1749496339556094316), [пруф 2](https://github.com/mswjs/msw/issues/1644)~~   
 _Нужно отдельно оценить решение для применении axios в Next проекте_  
 [Сравнение React Query и tRPC с Next](https://www.youtube.com/watch?v=51pf_nCJpwg)
 
@@ -75,9 +77,14 @@ const getPost = async () => {
 ```
 
 **Типизация запросов**  
-При типизации используется generic: `post<T = any, R = AxiosResponse<T>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>): Promise<R>`  
+При типизации используется generic: `post<T = any, R = AxiosResponse<T>, D = any,  P = any>(url: string, data?: D, config?: AxiosRequestConfig<D>): Promise<R>`, где  
+* T — тип response.data;
+* R — тип полного результата;
+* D — тип request body;
+* P — тип params;  
+
 Результат типизации с конфигом:  
-`axios.post<TResponseData, AxiosResponse<TResponseData>, TRequestData>(url, data, config)`  
+`axios.post<TResponseData, AxiosResponse<TResponseData>, TRequestData, TRequestParams>(url, data, config)`  
 Результат типизации без конфига:  
 `axios.get<TResponseData>(url)`  
 
@@ -106,7 +113,7 @@ apiNameAxios.get(url)
 	Возвращает String, Buffer, ArrayBuffer, FormData, Stream 
 * `transformResponse: [function (data) { return data }]` - преобразование данных ответа до их дальнейшей обработки
 * `headers: {'X-Requested-With': 'XMLHttpRequest'}` - пользовательские заголовки для запроса
-* `params: { id: 132 }` - URL-параметры, передаваемые вместе с запросом (null или undefined не отображаются в URL)
+* `params: { id: 132 }` - query-параметры запроса. `undefined` не добавляется в URL, `null` сериализуется как пустое значение  
 * `paramsSerializer: function (params) { return Qs.stringify(params, { arrayFormat: 'brackets' }) }` - кастомная функция сериализации параметров  
 	[QS](https://www.npmjs.com/package/qs), [jquery.param](http://api.jquery.com/jquery.param/)
 * `data: { name: 'Petr' }` - данные передаваемые в POST, PUT, PATCH, DELETE запросах
@@ -121,21 +128,23 @@ apiNameAxios.get(url)
 _Игнорируется для `responseType: 'stream'`_  
 * `xsrfCookieName: 'XSRF-TOKEN'` - имя xsrf-cookie, которое может установить бэкенд для защиты от кроссайтовых атак (по умолчанию `XSRF-TOKEN`)
 * `xsrfHeaderName: 'X-XSRF-TOKEN'` - заголовок http содержащий xsrf-токен (по умолчанию `X-XSRF-TOKEN`)
-* `onUploadProgress: function (progressEvent) {}` - обрабатывает события прогресса загрузки при отправке данных (только для браузера)  
+* `withXSRFToken` - управляет добавлением XSRF-заголовка: по умолчанию только для same-origin запросов; `true` - разрешает и для cross-origin, `false` - отключает
+* `onUploadProgress: function (progressEvent) {}` - обрабатывает события прогресса загрузки при отправке данных  
 	* `progressEvent.loaded` - количество переданных байт
 	* `progressEvent.total` - общий размер данных
-* `onDownloadProgress: function (progressEvent) {}` - аналогично `onUploadProgress`, но для отслеживания загрузки при получении ответа с данными (только для браузера) 
+* `onDownloadProgress: function (progressEvent) {}` - аналогично `onUploadProgress`, но для отслеживания загрузки при получении ответа с данными   
 * `maxContentLength: 2000` - максимальный размер содержимого ответа http в байтах (для Node.js)
 * `maxBodyLength: 2000` - максимальный размер содержимого запроса в байтах (для Node.js)
-* `maxRedirects: 5` - максимальное количество перенаправлений в Node.js (если 0, то перенаправления не будут выполняться, 5 - по умолчанию)  
+* `maxRedirects: 21` - максимальное количество перенаправлений в Node.js (если 0, то перенаправления не будут выполняться, 21 - по умолчанию)  
 * `socketPath: null` - определяет UNIX сокет в Node.js для отправки запроса к Docker (null по умолчанию)
 * `proxy: { protocol: 'https', host: '127.0.0.1', port: '8000', auth: {} }` - определяет прокси  
 Если используется совместно с `socketPath`, то `socketPath` имеет больший приоритет
-* `httpAgent: new http.Agent({ keepAlive: true })` или `httpsAgent: new https.Agent({ keepAlive: true })` - определяют агента, который будет использоваться при выполнении http/https запросов  
+* `httpAgent: new http.Agent({ keepAlive: true })` или `httpsAgent: new https.Agent({ keepAlive: true })` - пользовательские Node.js агенты для дополнительной настройки HTTP/HTTPS соединения (`keepAlive` и др.)  
 Используется для добавления параметров не включенных по умолчанию, например `keepAlive`
 * `cancelToken: new CancelToken(function (cancel) {})` - указывает токен для отмены запроса **Устарел**
 * `decompress: true` - указывает нужно ли распаковывать сжатое тело ответа (по умолчанию true)
-* `adapter: function(config) {}` - настройка обработки запросов для упрощения тестирования 
+* `adapter: function(config) {}` -  механизм выполнения запроса. Встроенные адаптеры: `xhr` (браузер), `http` (Node.js), `fetch`;  
+также можно передать собственный adapter, например для тестирования
 
 [Вернуться к содержанию](#содержание)
 
@@ -198,7 +207,7 @@ axios.get(url, { params: { searchText: "Petr" } }).then(function (response) {
 * `mock.onGet / mock.onPost` и т.д. - срабатывание на конкретный метод запроса
 * `mock.onAny` - срабатывание мока на любой метод запроса  
 `mock.onGet(url).reply(200).onAny().reply(500)` - метод GET выдаст успешный ответ, все остальные - ошибку 500
-* `mock.onGet(url).reply(200).onAny().passThrough()` - `passThrough` позволяет отправлять в сеть запросы, не обработанные моком. Без использования будет ошибка  
+* `mock.onGet(url).reply(200).onAny().passThrough()` - `passThrough` позволяет отправлять в сеть запросы, не обработанные моком. По умолчанию запрос, для которого не найден mock handler, получает ответ `404`.  
 Альтернативно можно передать параметр **onNoMatch** при создании мока для отправки в сеть запросов, не обработанных моком  
 `const mock = new MockAdapter(axiosInstance, { onNoMatch: "passthrough" });`  
 `onNoMatch: "throwException"` - вызовет ошибку при отправке запросов, не обработанных моком
@@ -215,7 +224,7 @@ axios.get(url, { params: { searchText: "Petr" } }).then(function (response) {
 * `statusText` - текстовое описание кода статуса ответа
 * `headers` - заголовки
 * `config` - конфигурация axios для отправки запроса
-* `request` - параметры самого запроса в одном объекте
+* `request` - низкоуровневый объект выполненного запроса (`XMLHttpRequest` в браузере, `ClientRequest` в Node.js)
 
 [Вернуться к содержанию](#содержание)
 
@@ -266,36 +275,30 @@ axios.get('/foo/bar', {
 	signal: controller.signal
 }).catch((error) => {
 	// два способа отловить отмену запроса через AbortController
+
+	// AbortController был переведен в состояние aborted
 	if (controller.signal.aborted) {}
-	if (error.name === 'CanceledError' || error.name === 'AbortError') {}
+
+	// конкретный Axios-запрос завершился отменой
+	if (axios.isCancel(error)) {}
+	// или:
+	if (error.code === 'ERR_CANCELED') {}
 });
 
 controller.abort();
 ```
 
-Альтернативный способ:  
-```javascript
-const CancelToken = axios.CancelToken;
-const source = CancelToken.source();
-
-axios.get(url, {
-	cancelToken: source.token
-}).catch(function (thrown) {
-	if (axios.isCancel(thrown)) { /* обработка отмены запроса */ }
-	else { /* обработка ошибки */ }
-});
-
-source.cancel('Необязательное сообщение');
-```
-
-Можно указать оба способа в одном запросе, но `CancelToken` считается устаревшим.
-
 [Вернуться к содержанию](#содержание)
 
 ## 5. Обработка ошибок
 
-**Пример** обработки ошибок  
-_Поля ошибки: data, status, headers, request, message, config_  
+**Основные поля `AxiosError`:**
+* `message` - сообщение об ошибке
+* `code` - код ошибки Axios
+* `config` - конфигурация запроса
+* `status` - HTTP-код ответа, если он был получен
+* `request` - объект выполненного запроса
+* `response` - ответ сервера; содержит `data`, `status`, `headers` и другие поля
 
 ```javascript
 axios.get(url)
@@ -351,6 +354,8 @@ axios.postForm(url, {
 	key: value
 })
 ```
+
+При передаче браузерного `FormData` не нужно вручную устанавливать `Content-Type: multipart/form-data` - браузер/Axios добавит его вместе с корректным `boundary`.
 
 [Вернуться к содержанию](#содержание)
 
