@@ -1339,10 +1339,11 @@ document.querySelector('#input_id')?.classList.add() // пример работ�
 [Хороший разбор](https://www.youtube.com/watch?v=HToDur7Gkkw)  
 
 Специальная конструкция позволяющая сделать неитерируемый объект, например object, перебираемым.  
-Для создания iterable-интерфейса объекта, нужно:  
-1. задать объекту `Symbol.iterator`  
-2. символ должен вернуть метод `next()`  
-3. next() возвращающий объект со свойствами `value` и `done`, где `value` - перебираемое значение, `done` - статус выполнения перебора  
+Для создания iterable-интерфейса объекта нужно:  
+1. задать объекту метод `[Symbol.iterator]()` 
+2. метод `[Symbol.iterator]()` должен вернуть объект-итератор
+2. объект-итератор должен иметь метод `next()`, где   
+`next()` возвращающий объект со свойствами `value` - перебираемое значение и `done` - статус выполнения перебора  
 ```javascript
 const obj = {  
 	name: 'Alex',  
@@ -1438,7 +1439,7 @@ function * myGenerator() {}
 function *myGenerator() {}
 ``` 
 Операторы `yield`, `yield*` возвращают значение и приостанавливают выполнение функции с полным сохранением промежуточных вычислений  
-`yield*` перенаправляет итерацию в другой генератор  
+`yield*` делегирует итерацию другому `iterable`  
 Оператор `yield` используется в самой функции-генератора, _использование в колбеке приведет к ошибке_  
 
 ```javascript
@@ -1498,7 +1499,7 @@ generator.next() // {value: 'Sergey', done: false}
 generator.next() // {value: 'Maria', done: false}
 ```
 
-Метод `throw()` - выбрасывает ошибку, которая может быть перехвачена в генераторе. Генератор не завершает работу  
+Метод `throw()` - выбрасывает ошибку в текущей точке приостановки генератора. Если ошибка перехвачена внутри генератора, его выполнение может продолжиться; если нет — генератор завершается с ошибкой  
 Метод `return(value)` - завершает выполнение функции и возвращает переданное значение `value`  
 ```javascript
 function* getNames() {
@@ -1527,7 +1528,10 @@ console.log(generator.next()); // { value: undefined, done: true }
 
 ### 9.1 Spread
 
-Spread - расширяющий синтаксис `...`, позволяющий развернуть итерируемый объект.  
+Spread - расширяющий синтаксис `...`, позволяющий:
+- развернуть iterable в элементы массива или аргументы функции;  
+- в object literal копирует собственные перечисляемые свойства объекта  
+
 Применение:
 
 * Копирование (поверхностное):  
@@ -1586,7 +1590,7 @@ const obj = {}
 [obj.name, obj.age] = ['Petr', 18] 
 
 // деструктуризация в цикле
-for(let [key, value] in Object.entries(obj) {} 
+for(let [key, value] of Object.entries(obj)) {} 
 
 // обмен значениями переменных  
 let guest = 'Petr', admin = 'Olga'  
@@ -1630,8 +1634,8 @@ const {name, age} = func(obj)
 Коллекции реализуют Iterable интерфейс, поэтому их можно использовать в циклах, применять spread (`[...mapCollection]`) и т.д.  
 **Отличие от объектов**: 
 1. В качестве ключа может быть **любой тип данных** (объекты/функции/массивы/NaN и т.д.). Ключи сохраняют свой тип и НЕ преобразуются в string  
-2. **Обратиться напрямую к элементу коллекции НЕЛЬЗЯ** (`mapCollection.item / mapCollection[item]` - ошибки)  
-3. При итерации последовательность добавленных элементов сохраняется (в объекте зависит от браузера/среды исполнения и других договоренностей)  
+2. **Обратиться напрямую к элементу коллекции НЕЛЬЗЯ** (`mapCollection.item / mapCollection[item]` не обращаются к элементам Map). Для доступа используются методы `get()` / `set()`.
+3. При итерации Map элементы сохраняют порядок добавления. В Object порядок свойств сложнее: целочисленные ключи идут по возрастанию, остальные строковые ключи — в порядке создания.  
 4. Не сериализуются JSON (можно предварительно перевести в объект)  
 
 [Вернуться к содержанию](#содержание)
@@ -1642,7 +1646,7 @@ const {name, age} = func(obj)
 **Отличие от объектов:** 
 * ключами могут быть значения любого типа
 * реализован Iterable интерфейс  
-* нет прототипного наследования
+* элементы Map не наследуются через цепочку прототипов  
 * элементы сохраняют порядок добавления при итерации  
 
 **Примеры инициализации**
@@ -1659,23 +1663,23 @@ const {name, age} = func(obj)
 >При создании ключей ссылочного типа их нужно передавать в виде переменной, чтобы можно было к ним обратиться  
 
 **Методы Map:**  
-* testMap.set(key, value) - добавляет или изменяет значение элемента (возвращает коллекцию) 
+* `testMap.set(key, value)` - добавляет или изменяет значение элемента (возвращает коллекцию) 
 ```javascript
 testMap.set('name', 'Petr').set('age', 18) // можно выстраивать в цепочки  
 ```
-* testMap.get(key) - возвращает значение элемента или undefined
-* testMap.delete(key) - удаляет элемент, возвращает boolean (true - удален)  
-* testMap.has(key) - boolean. проверяет наличие элемента с переданным ключом  
-* testMap.clear() - очищает коллекцию  
-* testMap.forEach(callbackFn(element[,key[,mapCollection]])[, thisArg]) - стандартный метод forEach для коллекции Map  
-* testMap.values() - возвращает итератор всех значений коллекции (в порядке добавления)  
-* testMap.keys() - возвращает итератор всех ключей коллекции (в порядке добавления)  
-* testMap.entries() - возвращает итератор пар ключ-значение (в порядке добавления)  
+* `testMap.get(key)` - возвращает значение элемента или undefined
+* `testMap.delete(key)` - удаляет элемент, возвращает boolean (true - удален)  
+* `testMap.has(key)` - boolean. проверяет наличие элемента с переданным ключом  
+* `testMap.clear()` - очищает коллекцию  
+* `testMap.forEach(callbackFn(element[,key[,mapCollection]])[, thisArg])` - стандартный метод forEach для коллекции Map  
+* `testMap.values()` - возвращает итератор всех значений коллекции (в порядке добавления)  
+* `testMap.keys()` - возвращает итератор всех ключей коллекции (в порядке добавления)  
+* `testMap.entries()` - возвращает итератор пар ключ-значение (в порядке добавления)  
 При использовании в цикле по умолчанию всегда вызывается map.entries(): `for(let [key, value] of testMap) {...}`  
 Трансформация коллекции в объект: `Object.fromEntries(testMap.entries())`  
-* testMap.groupBy(items, callbackFn) - возвращает **`Map`** сгрупированных элементов по правилам callbackFn. Работает аналогично `Object.groupBy()` <font color="#7ead74">_**[Baseline 2024]**_</font>   
+* `testMap.groupBy(items, callbackFn)` - возвращает **`Map`** сгрупированных элементов по правилам callbackFn. Работает аналогично `Object.groupBy()` <font color="#7ead74">_**[Baseline 2024]**_</font>   
   * `items` - итерируемая сущность  
-  * `callbackFn(element, index)` - функция группировки. Должна возвращать строку/символ указывающую на группу элемента. Значения, не соответствующие разрешенным типам, приводятся к строке.  
+  * `callbackFn(element, index)` - функция группировки. Возвращаемое значение используется как ключ Map и **может иметь ЛЮБОЙ тип**.  
 ```javascript
 const persons = [
 	{name: 'Petr', age: 16},
@@ -1685,8 +1689,8 @@ const persons = [
 const groupedByAge = Map.groupBy(persons, ({age}) =>  age < 18 ? 'young' : 'old');
 console.log(groupedByAge.get('young')) // [ {name: 'Petr', age: 16} ]
 ```
-* testMap.getOrInsert(key, defaultValue) - возвращает значение по ключу. Если ключа нет, вставляет `defaultValue` и возвращает его. <font color="#7ead74">_**[Baseline 2026]**_</font>
-* testMap.getOrInsertComputed(key, callback(key)) - возвращает значение по ключу. Если ключа нет, вызывает `callback(key)`, вставляет результат и возвращает его. <font color="#7ead74">_**[Baseline 2026]**_</font>
+* `testMap.getOrInsert(key, defaultValue)` - возвращает значение по ключу. Если ключа нет, вставляет `defaultValue` и возвращает его. <font color="#7ead74">_**[Baseline 2026]**_</font>
+* `testMap.getOrInsertComputed(key, callback(key))` - возвращает значение по ключу. Если ключа нет, вызывает `callback(key)`, вставляет результат и возвращает его. <font color="#7ead74">_**[Baseline 2026]**_</font>
 ```js
 // Было
 if (!map.has(key)) {
@@ -1757,7 +1761,7 @@ console.log(testSet.symmetricDifference(anotherSet)) // Set(4) {3,5,7,4}
 ```javascript
 const testSet = new Set([1,3,5,7,9])
 const anotherSet = new Set([1,4,9])
-console.log(testSet.union(anotherSet)) // Set(4) {1,3,5,7,9,4}
+console.log(testSet.union(anotherSet)) // Set(6) {1,3,5,7,9,4}
 ```
 * `testSet.isDisjointFrom(other)` - возвращает boolean, проверяя есть ли элементы из `testSet` в `other` <font color="#7ead74">_**[Baseline 2024]**_</font>  
 * `testSet.isSubsetOf(other)` - возвращает boolean, проверяя содержатся ли все элементы из `testSet` в `other` <font color="#7ead74">_**[Baseline 2024]**_</font>  
@@ -1774,12 +1778,19 @@ console.log(testSet.union(anotherSet)) // Set(4) {1,3,5,7,9,4}
 Элемент удаляется, если в коде он нигде не используется (нет сильных ссылок):  
 ```javascript
 let obj = {name: 'Petr'}  
-const testWeakMap = new WeakMap([obj: 'Data'])  
-obj = null // удалили объект и более он нигде не используется  
-testWeakMap.has(obj) // false - элемент был удален сборщиком мусора  
+const testWeakMap = new WeakMap([[obj, 'Data']])
+
+testWeakMap.has(obj) // true
+
+obj = null 
+// Сильных ссылок на исходный объект больше нет.
+// Теперь объект может быть удален сборщиком мусора,
+// а соответствующая запись WeakMap исчезнет вместе с ним.
+// Момент удаления объекта сборщиком мусора недетерминирован, поэтому проверить удаление через WeakMap напрямую нельзя.
 ```
 
-В качестве ключе коллекции WeakMap могут быть **ТОЛЬКО элементы с типом Object** (объекты, другие коллекции, массивы, функции)  
+>В качестве ключе коллекции WeakMap могут быть **ТОЛЬКО элементы с типом `Object` (объекты, другие коллекции, массивы, функции) или `non-registered Symbol`, но не символы из глобального реестра (Symbol.for().**  
+
 Наиболее часто используется для кэширования элементов. Если их удалят, то память в кэше автоматически освободит сборщик мусора  
 
 Доступные методы (работают аналогично Map):  
@@ -1838,8 +1849,9 @@ async function* myGenerator() {
 Асинхронные функции возвращают объект `Promise` в качестве значения, в котором хранится результат вычисления  
 
 **Использование промиса**  
-Конструктор принимает колбек-функцию `executor`, которая выполняет асинхронную операцию и переводит промис в `fulfilled` или `rejected`  
-В качестве аргументов передаются колбеки `resolve, reject` для перевода в соответствующие состояния  
+Конструктор принимает колбек-функцию `executor`, которая синхронно вызывается при создании Promise.  
+В качестве аргументов executor получает колбеки `resolve` и `reject`.  
+В базовом случае внутри executor запускается асинхронная операция, по результату которой вызывается `resolve` / `reject`, которые переводят Promise в состояние `fulfilled` / `rejected`.
 Аргумент переданный в `resolve` будет доступен в `then`, аргумент переданный в `reject` будет доступен в `catch`  
 ```javascript
 const myPromise = new Promise((resolve, reject) => {
@@ -1869,7 +1881,8 @@ myPromise
 Последним в цепочке принято использовать `catch`, чтобы он мог отловить любую ошибку выше.  
 Если ошибка возникнет внутри самого `catch`, она создаст новый отклоненный промис и может привести к `unhandledrejection`, если дальше нет обработки.
 * `.finally(onDone)` - выполнение кода вне зависимости от результата промиса  
-Если в `finally` отсутствует возврат значения (`return`), то в следующие по цепочке блоки попадет результат из предыдущих блоков, вернувших значение (then, catch)  
+Обычное значение, возвращенное из finally, не изменяет результат цепочки: дальше передается предыдущее значение или ошибка.  
+Если finally выбросит ошибку или вернет `rejected` Promise, цепочка завершится этой ошибкой.
 `then, catch, finally` могут чейниться в **любой** последовательности.  
 
 **Пример использования промиса:**  
@@ -1908,8 +1921,8 @@ console.log(promise === resolved) //false
 resolved.catch((value) => { console.log(value) }) // Promise {<resolved>: Petr }
 ```
 
-* `Promise.all([promise1, promise2, ...promiseN]).then(() => {})` - параллельно запускает несколько промисов и ожидает их выполнения  
-Возвращает промис, который выполнится при выполнении всех промисов или отклонится при отклонении любого промиса  
+* `Promise.all([promise1, promise2, ...promiseN]).then(() => {})` - позволяет запустить параллельно несколько асинхронных операций и ожидать их выполнения  
+Возвращает Promise, который выполнится при выполнении всех Promise или отклонится при отклонении любого из них  
 ```javascript
 Promise.all([Promise.resolve('Petr'), 'Olga'])
 .then((value) => { 
@@ -1924,6 +1937,9 @@ const myPromiseAll = async (promises) => {
   return new Promise((res, rej) => {
     const result = []
     let resolvedPromises = 0;
+    if (promises.length === 0) {
+	  return res([])
+    }
     promises.forEach((promise, index) => {
         Promise.resolve(promise)
           .then(res => {
@@ -1950,7 +1966,7 @@ promises.then(res => console.log(res)) // [ {"status": "fulfilled", "value": "Pe
 Возвращает промис, который выполнится, если любой из массива промисов выполнится. Если все промисы завершаются с ошибкой, завершается с ошибкой AggregateError
 * `Promise.race([promise1, promise2, ...promiseN])` - параллельно запускает несколько промисов и ожидает первый завершенный промис (с ошибкой или без)   
 Возвращает промис, который выполнится если первый завершенный промис завершится успешно или отклонится, если первый завершенный промис завершится с ошибкой  
-**Нельзя передавать пустой массив!** иначе промис зависнет не получив исполненного промиса или значения  
+**Нельзя передавать пустой массив!** иначе возвращенный Promise навсегда останется в состоянии `pending`.  
 * `Promise.try(callback)` - метод для запуска callback с автоматическим преобразованием и синхронных, и асинхронных ошибок в `Promise`-reject. <font color="#7ead74">_**[Baseline 2025]**_</font>  
 ```js
 function parseJson(text) {
@@ -1990,8 +2006,10 @@ promise.then((value) => {
 
 [Разбор с примером](https://www.youtube.com/watch?v=8Guo321ACcU)
 
-При передаче в методы не промиса, а значения любого типа (текст, число и т.д.) оно вернется раньше любого промиса, т.к. уже вычислено 
->Чтобы избежать зависания промисов можем обернуть методы в Promise.race, добавив в него reject по таймеру, который вернется, если за время таймера остальные промисы не успели исполниться  
+При передачи в методы значений, не являющихся Promise (текст, число и т.д.), они обрабатываются как уже успешно выполненные и вернутся раньше любого промиса  
+Дальнейшее поведение зависит от конкретного метода (all, allSettled, any, race).  
+>Чтобы избежать зависания промисов можем обернуть методы в Promise.race, добавив в него reject по таймеру  
+Promise.race() ограничивает время ожидания результата, но сам по себе не отменяет остальные выполняющиеся операции. Для отмены fetch используется AbortController.  
 
 [Кастомный Promise с нуля](https://www.youtube.com/watch?v=rJ5u7rsMU6g)  
 
@@ -2030,7 +2048,7 @@ import {data} from 'child'
 * options - необязательный объект конфигурации запроса [Список свойств](https://developer.mozilla.org/en-US/docs/Web/API/Request)  
 Метод возвращает промис со специальным объектов `Response`, содержащим поля:  
 * ok - boolean. Статус успешности запроса
-* json - метод, возвращающий результат запроса в формате json
+* json - читает body ответа, парсит JSON и возвращает Promise с полученным JavaScript-значением.  
 * [Список остальных свойств](https://developer.mozilla.org/en-US/docs/Web/API/Response)
 ```javascript
 const data = {
@@ -2050,8 +2068,13 @@ fetch('http://jsonplaceholder.typicode.com/posts', {
 	.then(res => console.log(res))
 ```  
 
-Для загрузки файлов используются интерфейсы: [ReadableStream](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream), [Blob](https://developer.mozilla.org/en-US/docs/Web/API/Blob), [ArrayBuffer](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer)
-Альтернативный способ - библиотека Axios ([Axios.md](https://github.com/Ragna13377/Docs/blob/main/Axios.md)). Под капотом используется `XMLHttpRequest` для совместимости со старыми браузерами
+Для загрузки файлов используются интерфейсы: [ReadableStream](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream), [Blob](https://developer.mozilla.org/en-US/docs/Web/API/Blob), [ArrayBuffer](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer)  
+
+Альтернативный способ - библиотека Axios ([Axios.md](https://github.com/Ragna13377/Docs/blob/main/Axios.md)).  
+Axios использует адаптеры для выполнения запросов: в браузере обычно XHR, также доступен fetch adapter; в Node.js используется HTTP adapter.
+
+>`fetch()` не переводит Promise в `rejected` только из-за HTTP-статусов 404, 500 и т.д.  
+В таком случае возвращается Response, поэтому успешность ответа проверяется через `response.ok` или `response.status`.
 
 [Вернуться к содержанию](#содержание)
 
@@ -2110,8 +2133,15 @@ useEffect(() => {
 [Еще примеры](https://www.youtube.com/watch?v=puxkpNbCh0w)  
 
 * `setTimeout(callbackFn, delay, [, param1[, param2[, paramN]]])` - отложенный на время `delay` в мс однократный запуск `callbackFn` с переданными параметрами
->При переполнении задержки Timeout (превышает 32битное целое число со знаком), Timeout будет вызван немедленно  
-`setTimeout(() => console.log("called"), Infinity); // значение задержки будет установлено в 1`
+>delay ограничен signed 32-bit integer (~ 2147483647 ms).  
+При передаче большего значения происходит переполнение, поэтому фактическая задержка может стать другим меньшим значением, в том числе 0, и таймер выполнится практически сразу.  
+>```javascript
+>setTimeout(callback, 2 ** 32 - 5000)
+>// overflow → отрицательное значение → практически сразу
+>
+>setTimeout(callback, 2 ** 32 + 5000)
+>// overflow → 5000 → примерно через 5 секунд
+>```
 * `setInterval(callbackFn, delay[, param1[, param2[, paramN]]])` - циклический запуск `callbackFn` с переданными параметрами через каждой интервал `delay` в мс
 
 >`delay` в функиях `setInterval`, `setTimeout` - **минимальное** время(не точное), через которое запустится `callbackFn`, т.к. асинхронные функции выполняются после завершения синхронного кода [13. Event Loop](#13-event-loop)  
@@ -2119,8 +2149,7 @@ useEffect(() => {
 Функции возвращают идентификатор таймера. Для прерывания таймеров необходимо передать идентификатор в `clearTimeout()`, `clearInterval()`  
 
 **Создание `setInterval` через `setTimeout`:**
-`setInterval` запускает выполнение новой итерации через `delay` относительно **начала предыдущей итерации** без учета времени выполнения `callbackFn`.  
-Может возникнуть переполнение стека вызовов - падение кода с ошибкой (Maximum call stack size exceeded), если `callbackFn` выполняется дольше `delay`  
+`setInterval` запускает выполнение новой итерации через `delay` относительно **начала предыдущей итерации** без учета времени выполнения `callbackFn`.
 Кастомный `setInterval`, созданный через `setTimeout` запускается через `delay` после **окончания выполнения `callbackFn`** в предыдущей итерации.  
 ![График рекурсивного setTimeout и setInterval](https://www.technicalfeeder.com/wp-content/uploads/recursive-function-setTimeout-setInterval.png)
 
@@ -2185,8 +2214,8 @@ const targetElement = document.querySelector('.element')
 const callback = (entries, observer) => {
 	entries.forEach(({isIntersecting, intersectionRatio, target}) => {
 		if(isIntersecting) {
-			if(intersectionRatio > 0 && intersectionRatio < 1) console.log('Начало пересечения')
-			if(intersectionRatio === 1) console.log('Конец пересечения')
+			if(intersectionRatio > 0 && intersectionRatio < 1) console.log('Частичное пересечение')
+			if(intersectionRatio === 1) console.log('Полное пересечение')
 			observer.unobserve(target)
 		}
 	})
@@ -2217,22 +2246,23 @@ observer.observe(targetElement)
 Объект options включает одно свойство timeout - время задержки выполнения callback в мс.  
 
 `queueMicrotask(callback)` - добавляет переданный `callback` в очередь микротасок [13. Event Loop](#13-event-loop)  
-Используется для отложенного выполнения `callback`, после синхронного кода  
+Используется для отложенного выполнения `callback` в очередь microtasks  
 Используется при выравниваниия поведения между синхронной и асинхронной веткой  
 ```javascript
 function getUser(id) {
-  // синхронная ветка
-  // if (cache[id]) {
-  //   console.log('from cache');
-  //   return cache[id]; 
-  // }
+	if (cache[id]) {
+		// Без queueMicrotask эта ветка вызвала бы onLoad синхронно:
+		// onLoad(cache[id])
+		// return
 
-  // асинхронный аналог
-  queueMicrotask(() => {
-	console.log('from cache');
-	onLoad(cache[id]);
-  });
-  return;
+		// Откладываем выполнение до microtask,
+		// чтобы поведение было согласовано с асинхронной веткой
+		queueMicrotask(() => {
+			console.log('from cache')
+			onLoad(cache[id])
+		})
+		return
+	}
 
   return fetch(`/users/${id}`)
     .then((res) => res.json())
@@ -2248,11 +2278,11 @@ function getUser(id) {
 ## 12. Error Handling  
 
 JS имеет встроенные виды ошибок:  
-* EvalError - ошибка в функции `eval()`
+* EvalError - legacy-тип ошибки, исторически связанный с `eval()`
 * RangeError - ошибки диапазона значений  
-* ReferenceError - ошибка обращения к несуществующим данным
+* ReferenceError - обращение к необъявленному или недоступному идентификатору
 * SyntaxError - синтаксические ошибки
-* TypeError - обращение к несуществующим свойствам  
+* TypeError - ошибка использования значения несовместимым с его типом способом  
 * URIError - ошибка обработки URI  
 * AggregateError - вид ошибки, представляющая объединение нескольких ошибок, обернутых в одну в одну  
 ```javascript
@@ -2275,7 +2305,8 @@ const myCustomError = new customError('Error text')
 throw myCustomError
 ```  
 
-Ключевое слово **throw** генерирует исключение, выполнение текущей функции останавливается (код после throw не будет выполнен)
+Ключевое слово **`throw`** прерывает обычное выполнение текущего блока и передает управление ближайшему подходящему `catch`.  
+Если ошибка не перехвачена, она распространяется вверх по стеку вызовов.  
 
 ---
 
@@ -2308,9 +2339,9 @@ catch (err) { console.log('outer error') }
 })(); // 3
 ```
 
->`try...catch` работает **только синхронно**  
-   
-Для обработки асинхронно возникающих ошибок нужно использовать синтаксис async/await  
+>`try...catch` напрямую перехватывает ошибки, возникающие синхронно во время выполнения блока try.  
+
+Для обработки асинхронно возникающих ошибок нужно использовать синтаксис async/await 
 ```javascript
 async function myFunc() {  
 	try { 
@@ -2364,9 +2395,9 @@ test2().then(console.log).catch(console.log); // caught
 В Call Stack попадает _контекст выполнения команды (Execution Context)_ - структура, сохраняющая служебные данные (область видимости, строку вызова, this и т.д.)
 Размер Call Stack ограничен и зависит от среды выполнения скрипта.  
 Call Stack блокируется из-за:
-1. Переполнения Call Stack
-2. alert, promt, confirm
-3. Тяжелые вычисления  
+1. Переполнения Call Stack — возникает ошибка Maximum call stack size exceeded  
+2. alert, prompt, confirm — блокируют выполнение до закрытия диалога
+3. Тяжёлых синхронных вычислений — занимают main thread и не дают выполнять следующие задачи  
 
 **Пример работы Call Stack:**  
 ```javascript
@@ -2384,14 +2415,15 @@ three()
 
 ### 13.1 Очередность
  
-1. все вызовы из Call Stack
-2. все вызовы из Microtask queue
-3. 1 вызов из Macrotask queue (если Call Stack и Microtask queue пусты, то выполняется следующая Macrotask)  
+1. Выполняется весь текущий синхронный код до опустошения Call Stack  
+2. Выполняются все задачи из Microtask Queue до её опустошения  
+3. Выполняется 1 задача из Macrotask queue  
+4. Повтор цикла. Т.о. если Call Stack и Microtask queue пусты, то выполняется следующая Macrotask  
 
 **Микротаски создают:**
-* Promise
+* обработчики Promise (then, catch, finally) и продолжение после await
 * queueMicrotask
-* Observer'ы
+* MutationObserver
 
 **Макротаски создают:**
 * Таймеры (setTimeout, setInterval)
@@ -2428,7 +2460,8 @@ requestAnimationFrame(() => {
 
 console.log('Synchronized end');
 ```
-Последовательность вывода:  
+Порядок всех вызовов, кроме requestAnimationFrame, фиксирован.   
+`requestAnimationFrame` выполняется перед очередной перерисовкой, поэтому его положение относительно task'ов может различаться в зависимости от момента следующего rendering opportunity.  
 1. Synchronized start
 2. Before promise timeout
 3. After promise timeout
@@ -2447,9 +2480,10 @@ console.log('Synchronized end');
 Также нужно разбивать тяжелые задачи, чтобы дать браузеру перерендерить страницу (даже если браузер не нуждается в новой отрисовке) - это избавит от дрожания анимации в будущем.  
 [Пример порядка выполнения](https://dev.to/bymarsel/unraveling-macrotasks-and-microtasks-in-javascript-what-every-developer-should-know-53mc)
 
->Прежде чем попасть в micro/macrotask queue команды обрабатываются в webAPI.  
+>Браузерные Web API, например таймеры, события и сетевые операции, выполняются/ожидаются средой браузера и при готовности ставят соответствующие задачи в очередь.  
 Например, `setTimeout(() => {}, delay)` попадет в очередь после `delay` мс.  
-Поэтому, если за время ожидания (`delay`) произойдут более быстрые асинхронные события, например срабатывание `click` (при установнном eventListener), то они попадут в очередь быстрее таймера.  
+Поэтому, если за время ожидания (`delay`) произойдут более быстрые асинхронные события, например срабатывание `click` (при установнном eventListener), то они попадут в очередь быстрее таймера.
+queueMicrotask() напрямую добавляет callback в Microtask Queue, а обработчики Promise (then/catch/finally) попадают туда при выполнении соответствующей Promise reaction.
 
 [Вернуться к содержанию](#содержание)
 
@@ -2465,7 +2499,7 @@ export const data = () => {}
 // another module
 import { data } from './index.js' 
 ```
-- По умолчанию (единственное объявление в модуле)  
+- По умолчанию — в модуле может быть только один default export
 При экспорте по умолчанию при импортировании данных можно указывать любые (в том числе несовпадающие) названия
 ```javascript
 // index.js
@@ -2479,16 +2513,20 @@ import exportData from './index.js'
 - Множественный (импорт всех экспортируемых данных): `import * as data from './index.js'`
 
 При импортировании данных, можно изменить название через ключевое слово `as`: `import { data as exportData } from './index.js' `
-Изменения в экспортированных объектах отражаются во всех модулях, импортирующих данные, т.к. объекты - ссылочный тип  
+Импортированные значения связаны с экспортом: если значение изменилось внутри экспортирующего модуля, изменение будет видно и в импортирующем модуле.   
+При этом напрямую переназначить импортированное значение нельзя  
 ```javaScript
 // module1.js
-export const obj = {name: 'Petr'}
+export let count = 0
+export const increment = () => count++
+
 // module2.js
-import {obj} from './module1.js'
-obj.name = 'Olga'
-// module3.js
-import {obj} from './module1.js'
-console.log(obj) // {name: 'Olga'}
+import { count, increment } from './module1.js'
+
+increment()
+console.log(count) // 1
+
+count = 5 // ошибка
 ```
 Решение проблемы - создание фабрики для генерации однотипных объектов: `export function createObj() { return {name: 'Petr'} }`  
 
@@ -2520,17 +2558,20 @@ console.log(obj) // {name: 'Olga'}
 WebWorker - API для выполнения кода вне основного потока.  
 Веб воркер создается в основном потоке. После загрузки скрипта воркера создается отдельный поток и собственный контекст отличный от window (self)  
 Создание воркера: 
-* `new Worker()` - доступен только в потоке, который его создал  
+* `new Worker()` - создает отдельный Dedicated Worker, связанный только с создавшим его контекстом  
 Общение между потоками осуществляется через асинхронный метод `postMessage`   
-* `new SharedWorker()` - доступен в любом потоке 
+* `new SharedWorker()` - создает воркер, к которому могут подключаться несколько вкладок, окон или iframe одного origin  
 Общение между потоками осуществляется через асинхронный метод `postMessage` в свойстве `port`  
->Данные отправленные через `postMessage` копируются, что ресурсозатратно при передаче большого объема данных  
+>Данные переданные через `postMessage` по умолчанию копируются с помощью structured clone, поэтому передача большого объема данных может быть ресурсозатратной  
+Для transferable-объектов, например ArrayBuffer, можно передать владение через transfer list без обычного копирования данных.  
 
 ```javaScript
 // index.js
 const worker = new Worker('worker.js')
 worker.postMessage({name: 'Petr'})
-worker.onmessage = (e) => { console.log(e) }
+worker.onmessage = (e) => {
+	console.log(e.data)
+}
 
 // завершение работы воркера
 worker.terminate();
@@ -2577,16 +2618,20 @@ document.cookie = "age=21";
 console.log(document.cookie); // "first_name=petr; age=21"
 ```  
 Дополнительные параметры можно передать через `;`: `document.cookie = 'name=petr;secure;max-age=100'`  
-* `path` - роут по которому доступна кука
-* `domain` - домен для куки (по умолчанию текущий). `.` перед доменом разрешает доступ ко всем поддоменам: `.my-domain.ru` 
-* `max-age` - время жизни куки в секундах
-* `expires` - точное время, когда кука станет недействительной  
-Для удаления куки устанавливается дата в прошлом `expires=${new Date(0)}`
-* `secure` - возможность передачи куки только по HTTPS
-* `samesite` - определяет возможность отправки при кросссайтовом запросе (`strict` - максимально ограничено, `lax` - более мягкое поведение для безопасных сценариев)
+* `Path` - роут по которому доступна кука
+* `Domain` - домен, для которого доступна cookie.  
+Если параметр не указан, cookie доступна только текущему хосту.  
+Если указан домен, cookie также доступна его поддоменам.  
+_Ведущая точка (.my-domain.ru) сейчас игнорируется_  
+* `MaxAge` - время жизни куки в секундах
+* `Expires` - точное время, когда кука станет недействительной  
+Для удаления куки устанавливается дата в прошлом `Expires=${new Date(0)}`
+* `Secure` - возможность передачи куки только по HTTPS
+* `SameSite` - определяет возможность отправки при кросссайтовом запросе (`strict` - максимально ограничено, `lax` - более мягкое поведение для безопасных сценариев)  
+Для `SameSite=None` обязательно требуется `Secure`
 
-Если название куки начинается с `__Secure-`, то обязательно должны быть установлен параметр `secure`  
-Если название куки начинается с `__Host-`, то обязательно должны быть установлены параметры `path` и `secure`, а параметр `domain` должен отсутствовать  
+Если название куки начинается с `__Secure-`, то обязательно должны быть установлен параметр `Secure`  
+Если название куки начинается с `__Host-`, то обязательно должны быть установлены параметры `Path=/` и `Secure`, а параметр `Domain` должен отсутствовать  
 >Сервер может ограничить доступ к куке через JS установив параметр HttpOnly  
 
 [Вернуться к содержанию](#содержание)
@@ -2604,14 +2649,17 @@ console.log(document.cookie); // "first_name=petr; age=21"
 const person = { name: 'Petr', age: 18 }
 window.localStorage.setItem('person', JSON.stringify(person))
 ```
-При установке значения в `localStorage` срабатывает событие `storage`, в котором доступны свойства:  
+При изменении `localStorage` событие `storage` срабатывает в других вкладках/окнах того же origin, но не срабатывает в документе, который сам выполнил изменение.  
+Для sessionStorage событие storage срабатывает только в других контекстах того же origin внутри той же вкладки, например в same-origin iframe.  
+
+В storage event доступны свойства::  
 * `key` - ключ, который был изменен (при вызове метода clear - null)
 * `oldValue` - старое значение
 * `newValue` - новое значение
 * `url` - адрес страницы, на которой произошло изменение
 
->Браузеры автоматически удаляют данные из хранилища по определенным условиям  
-Для постоянного хранения данных нобходимо вызвать `window.navigator.storage?.persist()`  
+>По умолчанию browser storage обычно имеет режим best-effort и при нехватке места может быть очищено браузером.  
+`navigator.storage.persist()` запрашивает persistent storage и возвращает Promise<boolean>; браузер может как предоставить, так и отклонить запрос.  
 
 [Вернуться к содержанию](#содержание)
 
@@ -2624,19 +2672,19 @@ window.localStorage.setItem('person', JSON.stringify(person))
 	* `indexedDB.deleteDatabase(name)` - удаление БД
 	* `indexedDB.databases()` - возвращает массив объектов содержащих имена-версии всех доступных БД  
 * `IDBRequest`
-	* `IDBRequest.result` - результат запроса
+	* `IDBRequest.result` - результат запроса  
+    * `IDBRequest.error` -  ошибка запроса (DOMException) или null, если ошибки нет  
 	* `error` - **событие** срабатывает при ошибке запроса к БД
 	* `success` - **событие** срабатывает при успешном запросе к БД
 * `IDBOpenDBRequest` - интерфейс предоставляет доступ к результатам запросов на открытие или удаление БД  
 Интерфейс не содержит собственных методов, наследуется от IDBRequest
-	* `blocked` - **событие** срабатывает, когда открытое соединение с БД блокиреут транзакцию на той же БД
+	* `blocked` - **событие** срабатывает, когда другое открытое соединение с БД блокирует versionchange-транзакцию, например при обновлении версии или удалении БД.  
 	* `upgradeneeded` - **событие** срабатывает в случае обращения к БД с версией превышающей текущую версию БД
 * `IDBDatabase` - интерфейс для управления транзакциями БД
 	* `IDBDatabase.close()` - закрывает соединение с БД
 	* `IDBDatabase.createObjectStore(name[, options])` - создает и возвращает новое объектное хранилище с именем `name`  
 		* `keyPath` - уникальный ключ идентификации элемента в объектном хранилище
-		* `autoIncrement` - boolean. Необязательное поле в опциях для автоинкретента ключа (по умолчанию false)  
-		Совместное использование опций приведет к ошибке  
+		* `autoIncrement` - boolean. Необязательное поле в опциях для автоинкретента ключа (по умолчанию false)   
 	* `IDBDatabase.deleteObjectStore(name)` - удаление объектного хранилища 
 	* `IDBDatabase.transaction(storeNames[, mode[, options]])` - создание новой транзакции (IDBTransaction), где  
 		* `storeNames` - объектное хранилище или массив объектных хранилищ
@@ -2662,21 +2710,16 @@ window.localStorage.setItem('person', JSON.stringify(person))
 	* `IDBObjectStore.delete(key)` - удалят запись в хранилище по ключу или диапазону ключей (IDBKeyRange)
 	* `IDBObjectStore.createIndex(indexName, keyPath[, options])` - создает новый индекс. Возвращает IDBIndex 
 	* `IDBObjectStore.deleteIndex(indexName)` - удаляет индек
-	* `IDBObjectStore.clear([query])` - очищает объектное хранилище от всех записей (query - диапазон IDBKeyRange для удаления)
+	* `IDBObjectStore.clear()` - очищает объектное хранилище от всех записей
 	* `IDBObjectStore.get(key)` - возвращает запись по заданному ключу или диапазону ключей (IDBKeyRange)
 	* `IDBObjectStore.getAll([query[, count]])` - возвращает все (или count) записей по ключу `query` или диапазону ключей (IDBKeyRange) 
 	* `IDBObjectStore.count()` - возвращает количество записей в объектном хранилище
 	* `IDBObjectStore.index(name)` - открывает индекс для доступа к серии записей по данному индексу
 	* `и т.д.`
->Все операции с IndexedDB асинхронны, но стандартный API возвращает не `Promise`, а `IDBRequest`.
+>Большинство операций чтения/записи IndexedDB асинхронны и возвращают IDBRequest, а не Promise.   
+Операции изменения структуры БД (createObjectStore, createIndex и т.д.) выполняются внутри versionchange-транзакции, обычно в обработчике upgradeneeded, и напрямую возвращают созданные объекты.  
 
 ```javaScript
-const indexedDB = 
-	window.indexedDB || 
-	window.mozIndexedDB || 
-	window.webkitIndexedDB || 
-	window.msIndexedDB || 
-	window.shimIndexedDB;
 const request = indexedDB.open('UserDB', 1);
 
 request.onerror = (e) => { console.log('error', e) }
@@ -2684,7 +2727,7 @@ request.onupgradeneeded = () => {
 	const db = request.result
 	const store = db.createObjectStore('users', {keyPath: 'id'}) // аналог primary_key
 	// создание индексов для ускорение поиска, сортировки фильтрации данных в объектном хранилище
-	store.createIndex('users_sex', ['sex'], {unique: false})
+	store.createIndex('users_sex', 'sex', { unique: false })
 	store.createIndex('city_and_country', ['city', 'country'], {unique: false})
 }
 request.onsuccess = () => {
@@ -2718,39 +2761,44 @@ request.onsuccess = () => {
 
 Многие события, такие как scroll, resize срабатывают слишком часто. Для ограничения частоты срабатывания применяют `throttle` и `debounce`  
 `throttle(fn)` - ограничивает частоту вызова функции по определенному интервалу времени  
-`debounce(fn)` - ограничивает частоту вызова функции до определенного интервала времени с момента последнего вызова  
+`debounce(fn)` - откладывает выполнение функции до момента, когда с последнего вызова пройдет заданный интервал времени без новых вызовов.    
 
-Упрощенные примеры:  
+Упрощенные trailing-варианты: 
 ```javascript
 const throttle = (fn, delay) => {
 	let timeout = null;
-	return function perform(...args) {
-		if(!timeout) {
-			timeout  = setTimeout(() => {
-				fn.apply(this, args)
-				clearTimeout(timeout)
-				timeout = null
-			}, delay)
+
+	return function (...args) {
+		if (timeout === null) {
+			timeout = setTimeout(() => {
+				fn.apply(this, args);
+				timeout = null;
+			}, delay);
 		}
-	}
-}
+	};
+};
 ```
 
 ```javascript
 const debounce = (fn, delay) => {
-	let timeout;
+	let timeout = null;
+
 	return function (...args) {
-		clearTimeout(timeout)
-		timeout = setTimeout(() => fn.apply(this, args), delay)
-	}
-}
+		if (timeout !== null) {
+			clearTimeout(timeout);
+		}
+
+		timeout = setTimeout(() => {
+			fn.apply(this, args);
+			timeout = null;
+		}, delay);
+	};
+};
 ```
 
-Вариант типизации любой функции, проходящий strict линтера (без any, unknown)
-```typescript
-const throttle = <F extends (...args: Parameters<F>) => 
-	ReturnType<F>>(fn: F, delay: number): ((...args: Parameters<F>) => void)
-```
+throttle и debounce также могут поддерживать `leading` и `trailing` вызовы:
+* `leading` - выполнение в начале интервала
+* `trailing` - выполнение в конце интервала
 
 [Вернуться к содержанию](#содержание)
 
@@ -2770,6 +2818,9 @@ const obj = weakRef.deref();
 	* heldValue - данные передаваемые в `callback`
 	* unregisterToken - токен для отмены регистрации
 * unregister(unregisterToken) - отмена регистрации объекта
+
+Сборка мусора недетерминирована: нельзя гарантировать, когда объект будет удален и будет ли вызван callback FinalizationRegistry.  
+Поэтому WeakRef и FinalizationRegistry не используются для критичной логики приложения или обязательной очистки ресурсов.  
 
 ```javascript
 let myObject = { name: 'Petr' }; // сильная ссылка

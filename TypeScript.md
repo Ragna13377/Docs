@@ -1202,7 +1202,7 @@ type Result = MyAwaited<Promise<Promise<string>>> // string
 
 ## 16. Полезные ссылки
 
-[Еще раз очень подробно о Typescript](https://www.youtube.com/watch?v=LWtHl__oEWc)  
+[Настоятельно рекомендуется к просмотру](https://www.youtube.com/watch?v=LWtHl__oEWc)  
 [Типизация React/Axios/Redux](https://www.youtube.com/watch?v=ApIStAZa8Vc)
 
 [Вернуться к содержанию](#содержание)
