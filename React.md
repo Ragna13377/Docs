@@ -41,7 +41,7 @@
 	- [5.4 Compound component](#54-compound-component)
 	- [5.5 Activity](#55-activity)
 	- [5.6 ViewTransition](#56-viewtransition)
-	- [5.7 Container Presenter](#57-container-presenter-component)
+	- [5.7 Container / Presentational components](#57-container-presenter-component)
 	- [5.8 Render Props](#58-render-props)
 * [6. ReactDOM. Элементы и события React](#6-reactdom-элементы-и-события-react) 
 * [7. Portals](#7-portals) 
@@ -53,10 +53,9 @@
 	- [9.2 React Server Component](#92-react-server-component)
 	- [9.3 Server Action](#93-server-action)
 	- [9.4 cache](#94-cache)
-* [10. Проекция состояния класса (редкий кейс)](#10-проекция-состояния-класса-редкий-кейс) 
-	- [10.1 Класс с редко изменяемым состоянием](#101-класс-с-редко-изменяемым-состоянием)
-	- [10.2 Класс с часто изменяемым состоянием](#102-класс-с-часто-изменяемым-состоянием)
-	- [10.3 Класс без собственных состояний](#103-класс-без-собственных-состояний)
+* [10. Интеграция классов с React (редкий кейс)](#10-интеграция-классов-с-react-редкий-кейс) 
+	- [10.1 Класс с собственным состоянием](#101-класс-с-собственным-состоянием)
+	- [10.2 Класс-сервис без состояния, влияющего на render](#102-класс-сервис-без-состояния-влияющего-на-render)
 * [Дополнительно](#дополнительно) 
 	
 ## React под капотом
@@ -2017,22 +2016,30 @@ console.log(3);
 
 [Отличные примеры применения](https://www.youtube.com/watch?v=Y34aQue4DIg)  
 
-`useSyncExternalStore(onStoreChange, getSnapshot, getServerSnapshot?)` - подписка на внешнее хранилище (API браузера, сторонние библиотеки за пределами React).  
-При изменении данных во внешнем хранилище происходит ререндер
-* onStoreChange(callback) - функция подписки, которая должна возвращать функцию отписки, где callback - вызывается при изменении хранилища
-* getSnapshot - функция возвращающая состояние внешнего хранилища (для клиента)
-* getServerSnapshot - функция возвращающая состояние внешнего хранилища (для сервера SSR)  
+`useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot?)` - подписка на внешнее хранилище (API браузера, сторонние библиотеки за пределами React).  
+При изменении хранилища subscribe должен вызвать переданный callback.  
+React повторно вызывает getSnapshot и сравнивает новый и предыдущий snapshot по Object.is. Если snapshot изменился - делает rerender    
+Пока store не изменился, getSnapshot должен возвращать то же значение. Для mutable store нужно возвращать cached immutable snapshot, а не создавать новый объект при каждом вызове.  
+* `subscribe(callback)` - функция подписки, которая должна возвращать функцию отписки, где callback - вызывается при изменении хранилища
+* `getSnapshot` - функция возвращающая состояние внешнего хранилища (для клиента)
+* `getServerSnapshot` - функция возвращающая состояние внешнего хранилища (для сервера SSR)  
 `getServerSnapshot` должен возвращать те же данные, что и при первоначальном рендере на клиенте  
 
 ```tsx
 const useMatchMedia = (query: string) => {
-  const getSnapshot = () => window.matchMedia(query).matches;
-  const subscribe = (listener: () => void) => {
-    const mediaQueryList = window.matchMedia(query);
-    mediaQueryList.addEventListener('change', listener);
-    return () => mediaQueryList.removeEventListener('change', listener);
-  }
-  return useSyncExternalStore(subscribe, getSnapshot);
+	const subscribe = useCallback((listener: () => void) => {
+		const mediaQueryList = window.matchMedia(query);
+
+		mediaQueryList.addEventListener('change', listener);
+
+		return () => mediaQueryList.removeEventListener('change', listener);
+	}, [query]);
+
+	const getSnapshot = useCallback(
+			() => window.matchMedia(query).matches,
+			[query],
+	);
+	return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
 
 const UseSyncExample = () => {
@@ -2041,8 +2048,7 @@ const UseSyncExample = () => {
 }
 ```
 
-`useSyncExternalStore` обеспечивает синхронное обновление состояния при подписке на внешние хранилища.  
-В сравнении с `useEffect`, который может вводить задержки из-за асинхронности эффектов, `useSyncExternalStore` гарантирует минимальную задержку и предсказуемость данных при синхронизации  
+`useSyncExternalStore` нужен для согласованной подписки React на внешние mutable sources. React читает store через getSnapshot и проверяет snapshot при изменениях, предотвращая отображение несогласованных версий внешнего состояния. 
 
 [Вернуться к содержанию](#содержание)
 
@@ -2052,7 +2058,11 @@ const UseSyncExample = () => {
 [Более подробный разбор(видео)](https://www.youtube.com/watch?v=GNVI9Pr_RKQ&t=777s)  
 
 `useId()` - генерирует уникальные идентификаторы **(не используется для ключей списков)**  
-`:R1:` - пример сгенерированного id. Его **невозможно** использовать в функциях поиска по DOM (querySelector) 
+
+Сгенерированный id может содержать символы, требующие экранирования в CSS-селекторе (например, `:`).
+Поэтому `querySelector(`#${id}`)` может не сработать без `CSS.escape(id)`.  
+Для поиска по id можно использовать `getElementById(id)`. На конкретный формат id от `useId` полагаться нельзя.  
+
 Особенности применения:  
 * гарантирует одинаковые id при генерации на сервере и клиенте (в отличие от сторонних библиотек (uuid)), если рендер на сервере и клиенте не имеет отличий   
 * подходит для создания уникальных id для связывания форм, label, aria- атрибутов (особенно при заранее неизвестном количестве форм)  
@@ -2065,43 +2075,50 @@ const UseSyncExample = () => {
 [Пример с обработкой ошибки(видео)](https://www.youtube.com/watch?v=PPOw-sDeoNw)  
 [Пример без обработки ошибки(видео)](https://www.youtube.com/watch?v=M3mGY0pgFk0)  
 
-`const [optimisticState, addOptimistic] = useOptimistic(state, updateFn)` - показывает другое (оптимистичное) состояние интерфейса во время асинхронного действия  
-* optimisticState - результирующее оптимистическое состояние (равно state, если действий не ожидается)
-* addOptimistic(optimisticValue) - функция вызывающая `updateFn(state, optimisticValue)`
-	* state - состояние, которое возвращается изначально и когда никаких действий не ожидается
-	* updateFn(currentState, optimisticValue) - чистая функция (аргументы: текущее и оптимистичное состояние), которая возвращает результат вычислений как оптимистическое состояние
+`const [optimisticState, setOptimistic] = useOptimistic(value, reducer?)` - позволяет временно показать оптимистичное состояние интерфейса во время Action  
+* `optimisticState` - текущее оптимистическое состояние (равно `value`, если никакой Action не выполняется)
+* `setOptimistic(optimisticValue)` - временно обновляет оптимистическое состояние на время Action
+  * если `reducer` не передан, `optimisticValue` становится новым оптимистическим состоянием
+  * если `reducer` передан, `optimisticValue` передаётся ему вторым аргументом
+* `value` - базовое значение, которое отображается, когда никакой Action не выполняется
+* `reducer(currentState, optimisticValue)` - чистая функция:
+	* `currentState` - текущее оптимистическое состояние
+	* `optimisticValue` - значение, переданное в `setOptimistic`
+	* возвращаемое значение становится следующим оптимистическим состоянием
 
 ```tsx
-import {useOptimistic} from 'react'
 function MyComponent({ messages, sendMessage }: TMyComponentProps) {
 	const formRef = useRef();
-	const [previousMessages, setPreviousMessages] = useState(messages);
+
+	const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+		messages,
+		(currentMessages, newMessage) => [
+			...currentMessages,
+			{
+				text: newMessage,
+				sending: true,
+			},
+		],
+	);
+
 	async function formAction(formData) {
-		// сохраняем текущее значение перед оптимистичным обновлением 
-		setPreviousMessages(optimisticMessages);
-		// оптимистичное значение, передающееся в updateFn
 		addOptimisticMessage(formData.get('message'));
 		formRef.current.reset();
-		// нужно предусмотреть отмену оптимистичных изменений
-		try { await sendMessage(formData); }
-		catch (error) {
-			// пример реализации отката к предыдущему состоянию
-			addOptimisticMessage(previousMessages);
+
+		try {
+			await sendMessage(formData);
+		} catch (error) {
+			// здесь можно показать ошибку пользователю
+			// optimistic state откатится к messages автоматически
 		}
 	}
-	const [optimisticMessages, addOptimisticMessage] = useOptimistic(messages, (state, newMessage) => [
-		...state,
-		{
-			text: newMessage,
-			sending: true,
-		},
-	])
 
 	return (
 		<>
 			{optimisticMessages.map((message, index) => (
-				<div key={index}> {message.text}
-					{!!message.sending && ( <small> Sending... </small> )}
+				<div key={index}>
+					{message.text}
+					{!!message.sending && <small> Sending... </small>}
 				</div>
 			))}
 			<form action={formAction} ref={formRef}>
@@ -2109,8 +2126,8 @@ function MyComponent({ messages, sendMessage }: TMyComponentProps) {
 				<button type="submit">Send</button>
 			</form>
 		</>
-	)
-};
+	);
+}
 ```
 
 [Вернуться к содержанию](#содержание)
@@ -2123,8 +2140,11 @@ function MyComponent({ messages, sendMessage }: TMyComponentProps) {
 * value - значение отображаемое в devtools (любой тип: массив/объект/строка и т.д.)
 * format - функция форматирования с аргументом value
 `useDebugValue(date, (date) => date.toDateString())`
-`useDebugValue` находится в теле компонента и вызывается при каждом рендере. Если `value` - отладочная функция с тяжелыми вычислениями, то ее можно передать в функцию форматирования `format`  
-Она будет запускаться только при открытом React DevTools  
+`useDebugValue` вызывается на верхнем уровне custom Hook и добавляет его отладочное значение в React DevTools.  
+
+Не стоит передавать тяжёлые вычисления в `value`, т.к. они будут выполняться при каждом render.   
+Для дорогого форматирования исходное значение передаётся в `value`, а вычисление — в `format`.  
+React DevTools вызывает `format` только при инспектировании компонента.
 
 [Вернуться к содержанию](#содержание)
 
@@ -2132,27 +2152,27 @@ function MyComponent({ messages, sendMessage }: TMyComponentProps) {
 
 [Самая актуальная инфа в доке](https://react.dev/reference/react/useActionState)  
 
-`const [state, formAction, isPending] = useActionState(fn, initialState, permalink?)` - хук, который позволяет обновлять состояние на основе результата действия формы, где  
-* `fn(previousState, formData)` - обычно асинхронная функция, вызываемая при отправке формы или нажатии кнопки  
-	* `previousState` - предыдущее состояние формы (изначально `initialState`)
-	* `formData` - аргументы формы
-* `initialState` - начальное состояние (должно быть сериализуемо)
-* `permalink` - уникальный URL страницы, испольуемый формой, для редиректа на другую страницу после отправки формы  
-При отправке формы (до загрузки JS бандла) произойдет редирект на `permalink`
-* `state` - текущее состояние (во время первого рендера соответствует `initialState`)
-* `formAction` - `action` передаваемый в компоненты формы или пропс `formAction` любой кнопки внутри формы, также может быть вызвано вручную внутри `startTransition`
-* `isPending` - флаг состояния Transition (перехода)
+`const [state, dispatchAction, isPending] = useActionState(reducerAction, initialState, permalink?)` - хук, который позволяет обновлять состояние на основе результата действия формы, где  
+* `reducerAction(previousState, actionPayload)` -  синхронная или асинхронная функция, вызываемая при запуске Action. Может выполнять side effects и должна вернуть новое состояние    
+	* `previousState` - предыдущее состояние (изначально `initialState`, затем результат предыдущего вызова `reducerAction`)
+	* `actionPayload` - значение, переданное в `dispatchAction`; при использовании `dispatchAction` как action формы это будет FormData
+* `initialState` - начальное состояние. При использовании Server Function должно быть сериализуемым
+* `permalink` - необязательный URL для progressive enhancement при Server Functions.  
+Если форма отправлена до загрузки JavaScript, браузер перейдёт на этот URL вместо текущей страницы
+* `state` - текущее состояние (при первом render соответствует `initialState`, затем результату `reducerAction`)
+* `formAction` - функция запуска Action. Может передаваться в action / formAction; при ручном вызове должна вызываться внутри startTransition
+* `isPending` - true, пока выполняется одна или несколько Actions этого `useActionState`
 
 ```tsx
 import { action  } from "./actions.js";
 const Index = () => {
-	const [state, formAction, isPending] = useActionState(action, null)
+	const [state, dispatchAction, isPending] = useActionState(action, null)
   return (
-    <form action={formAction}>
-			<button type="submit">Submit</button>
-			{isPending ? "Loading..." : state}
-		</form>
-	);
+    <form action={dispatchAction}>
+		<button type="submit">Submit</button>
+		{isPending ? "Loading..." : state}
+	</form>
+  );
 }
 ```
 
@@ -2160,11 +2180,11 @@ const Index = () => {
 
 `const { pending, data, method, action } = useFormStatus()` - хук `react-dom`, предоставляет информацию о статусе последней отправки родительской формы, где  
 * `pending` - boolean. True - форма в процессе отправки
-* `data` - отправляемые данные в формате FormData
-* `method` - метод отправки
-* `action` - функция переданная в `action`
+* `data` - отправляемый `FormData` или `null`, если форма сейчас не отправляется
+* `method` - HTTP-метод родительской формы (`'get' | 'post'`)
+* `action` - функция, переданная в `action` родительской формы, или `null`
 
->Хук вызывается в компоненте находящемся ВНУТРИ формы.
+> Хук должен вызываться в компоненте, находящемся ВНУТРИ родительской формы.
 
 ```tsx
 export const Index = () => {
@@ -2195,32 +2215,34 @@ const Submit = () => {
 ## 4.19 useEffectEvent
 
 `const onEvent = useEffectEvent(callback)` - хук, позволяющий вынести из `useEffect` нереактивную логику, которая должна читать актуальные props/state, но не должна вызывать повторный запуск effect, где
-* `callback` - логика EffectEvent  
+* `callback` - логика Effect Event, которая при вызове читает актуальные committed props/state  
 
 > Не стоит злоупотреблять хуком, как способом убрать "лишние" зависимости из effect-ов. Нужно использовать осмысленно, где это действительно необходимо  
 
 Effect Event (возвращаемое значение хука):  
 * можно вызывать только внутри `useEffect`, `useLayoutEffect`, `useInsertionEffect` или других Effect Event  
 * нельзя вызывать во время рендера
-* не рекомендуется передавать в другие компоненты или кастомные хуки  
+* нельзя передавать в другие компоненты или кастомные хуки — Effect Event должен использоваться локально рядом с Effect, которому он принадлежит
 
 [Вернуться к содержанию](#содержание)
 
 ## 4.20 Кастомные хуки
 
-Кастомные хуки - начинаются с use и используют внутри базовые хуки    
+Кастомные хуки - функции, начинающиеся с `use` и использующие внутри встроенные или другие кастомные хуки для переиспользования stateful-логики     
 Кастомные, также как и встроенные хуки не должны использоваться внутри условных конструкций, циклов и других функциях  
-Кастомные должны возвращать одно значение, массив (2 значения) или объект (>2 значений)  
-_Каждый вызов кастомного хука не зависит от другого вызова того же хука_  
+Кастомный хук может возвращать значения любого типа; формат возвращаемого значения определяется его API   
+_Если кастомный хук создаёт state через `useState` / `useReducer`, каждый его вызов получает собственный независимый state._
+
+Стоит обратить внимание:
+* useMediaQuery — подписка на matchMedia.
+* useLocalStorage / useSessionStorage — синхронизация state с Web Storage.
+* useEventListener / useWindowEvent — подписка на DOM/window events с cleanup.
+* `useLatest` - хранит последнее значение в `ref`, позволяя читать актуальное значение из стабильной подписки или callback без добавления этого значения в зависимости и без пересоздания подписки  
+
+[Библиотека полезных хуков](https://usehooks-ts.com/introduction)  
 
 [Неплохие кастомные хуки обертки над useState](https://www.youtube.com/watch?v=3SB278SY73s)  
-Cтоит обратить внимание: 
-* useSafeState - обновления состояния при fetch запросах без AbortController  
-* обертка над localStorage/sessionStorage - проверка доступности localStorage/sessionStorage и преобразования данных, т.к. в них хранится только string
 [Кастомные хуки для оптимизации](https://www.youtube.com/watch?v=XOSgHVzHEV4)  
-* useLatest - уменьшение количества рендеров при зависимости useCallback от нескольких state  
-* useEvent - аналог useLatest, только для функций  
-* useWindowEvent -  уменьшение количества рендеров при подписке на события  
 [Еще подробнее про useLatest](https://www.youtube.com/watch?v=ILg1zhl92AI)
 
 [Вернуться к содержанию](#содержание)  
@@ -2231,7 +2253,7 @@ Cтоит обратить внимание:
 
 [Объяснение преимуществ Suspense](https://www.youtube.com/watch?v=pj5N-Khihgc)  
 
-`<Suspense fallback={<Loader />}><MyComponent /></Suspense>` - позволяет отображать `fallback`, пока дочерние компоненты не закончат загрузку  
+`<Suspense fallback={<Loader />}><MyComponent /></Suspense>` - отображает `fallback`, если дочернее дерево suspend'ится во время render, и заменяет его основным UI, когда данные/код становятся доступны  
 Для постепенного раскрытия содержимого по мере загрузки, можно использовать вложенные `Suspense`  
 Если `OuterComponent` загружен, а `InnerComponent` продолжает загружаться - будет отображен `OuterComponent` и индикатор загрузки `InnerComponent`:    
 ```tsx
@@ -2244,24 +2266,36 @@ Cтоит обратить внимание:
 </Suspense>
 ```
 Для того, чтобы уже отображенные данные не заменялись на `fallback` при изменении запроса, нужно использовать `useTransition` или `useDeferredValue`  
-При завершении серверного рендеринга (SSR) компонента с ошибкой, на клиент приходит `fallback`, и повторно запускается рендеринг на клиенте   
+
+При streaming SSR, если дочерний компонент внутри `Suspense` выбросил ошибку на сервере, React отправляет `fallback` ближайшего `Suspense` и повторяет попытку render этого компонента на клиенте.    
+Если render на клиенте завершится успешно, ошибка пользователю не показывается. Если компонент снова выбросит ошибку, её обработает ближайший `ErrorBoundary`.   
 Ошибки на клиенте обрабатываются в `ErrorBoundary`  
-Для исключения компонента из рендера на сервере, в компонент **передается ошибка**:  
+
+>В React 19.3 компонент можно явно исключить из серверного render через `use(browser())`. На сервере React оставит `fallback` ближайшего `Suspense`, а на клиенте компонент отрендерится нормально.
 ```tsx
-<Suspense>
-	{
-		// window отсутствует в серверной среде
-		if (typeof window === 'undefined') {
-			throw Error('Client Side Rendering')
-		}
-	}
-</Suspense>
+import { Suspense, use } from 'react';
+import { browser } from 'react-dom';
+
+function BrowserOnlyComponent() {
+	use(browser('Component requires browser APIs'));
+
+	return <div>Client content</div>;
+}
+
+function App() {
+	return (
+		<Suspense fallback={<Loader />}>
+			<BrowserOnlyComponent />
+		</Suspense>
+	);
+}
 ```
 
+
 >`Suspense` поддерживает источники данных: 
->	1. Загрузка данных с помощью фреймворков, поддерживающих	 Suspense (Next)
->	2. React.lazy
->	3. use (экспериментальный) для чтения значения из Promise  
+>	1. Загрузка данных с помощью фреймворков, поддерживающих `Suspense` (Next)
+>	2. `React.lazy`
+>	3. `use` для чтения значения из Promise  
 
 >`Suspense` **НЕ** поддерживает источники данных: 
 >	1. Загрузка данных в useEffect
@@ -2271,9 +2305,17 @@ Cтоит обратить внимание:
 
 ### 5.1.1 Lazy Loading
 
-`lazy(load)` - ленивая загрзка компонентов. Возвращает Promise, содержащий разрешенный модуль с компонентом экспорта по умолчанию  
-React кэширует Promise (возвращаемое значение `load()`) и разрешенное значение промиса. Успешно разрешенное значение рендерится, ошибочное передается ближайшему `Error Boundary`.  
-Динамический импорт компонентов объявляется на уровне модуля **ВНЕ** других компонентов, т.к. при ререндере не будет происходить повторный вызов `lazy` и лениво загруженный компонент не сбросит свое состояние:  
+`lazy(load)` - позволяет отложить загрузку кода компонента до его первого render. `lazy` возвращает React-компонент, где  
+* `load` - функция возвращающая Promise/thenable, разрешающийся в объект с компонентом в `.default`  
+
+React кэширует Promise, возвращённый `load()`, и его resolved value.  
+При успешного resolve React рендерит компонент из `.default`. 
+Если Promise отклоняется, причина ошибки передаётся ближайшему `ErrorBoundary`.  
+
+Lazy-компонент нужно объявлять на уровне модуля ВНЕ других компонентов.  
+Если вызывать `lazy()` внутри компонента, при каждом его render будет создаваться новый тип компонента, из-за чего состояние lazy-компонента может сбрасываться.
+
+> По умолчанию `lazy(() => import(...))` ожидает компонент в `default export`.
 
 ```tsx
 // Объявление на верхнем уровне модуля
@@ -2299,8 +2341,15 @@ const MyComponent = () => {
 ## 5.2 Error Boundary  
 
 Механизм Error Boundary перехватывает ошибки в конструкторах дочерних компоненов, методах жизненного цикла и во время рендеринга: `<ErrorBoundary><MyComponent/></ErrorBoundary>`  
-> Ошибки не будут пойманы в обработчиках событий, асинхронном коде, SSR, в самом компоненте Error Boundary  
-Для отлова ошибок в обработчиках событий и асинхронном коде используется `try...catch`  
+
+> Error Boundary не перехватывает ошибки:
+> * в обработчиках событий;
+> * в обычном асинхронном коде (`setTimeout`, `requestAnimationFrame` и т.д.);
+> * во время SSR;
+> * в самом Error Boundary.
+>
+> Исключение: ошибки, выброшенные внутри callback `startTransition`, могут быть обработаны Error Boundary.  
+> Ошибки в event handlers и обычной async-логике обрабатываются локально через `try...catch` / `.catch()`.
  
 * Метод `getDerivedStateFromError(error)` вызывается после возниконовения ошибки в дочернем компоненте на этапе рендеринга  
 Принимает ошибку в параметре и возвращает значение для обновления состояния. Используется для рендеринга запасного варианта при ошибке  
@@ -2346,9 +2395,10 @@ class ErrorBoundary extends React.Component {
 
 ## 5.3 HOC (High Order Component)
 
-Паттерн используемый во фреймворках для создания компонента высшего порядка, объединяющего логику компонентов схожей функциональности  
-HOC-компонент получает аргументом исходный компонент и оборачивает его необходимыми свойствами и функционалом  
-Принято называть HOC-компоненты со слова with: `withClick`  
+переиспользования логики компонентов. HOC является функцией, которая принимает компонент и возвращает новый компонент с дополнительным поведением или props.    
+HOC принято называть с префиксом `with`: `withClick`, `withAuth`, `withAnalytics`. 
+
+> В современном функциональном React для переиспользования логики чаще используются custom hooks, но HOC всё ещё встречаются в существующих библиотеках и legacy-коде.
 
 ```tsx
 // собственные пропсы оборачиваемого компонента
@@ -2366,17 +2416,26 @@ type WrapperProps = {
 }
 
 // withClick.tsx
-const withClick = (WrappedComponent: ComponentType<PersonalProps & WrapperGeneratedProps>): ComponentType<PersonalProps & WrapperProps> => {
-	return function(props: PersonalProps & WrapperProps): ReactElement {
-		// общий функционал всех компонентов оборачиваемых в HOC
+const withClick = (
+		WrappedComponent: ComponentType<PersonalProps & WrapperGeneratedProps>
+): ComponentType<PersonalProps & WrapperProps> => {
+	return function WithClick({
+		alertText,
+		...props
+	}: PersonalProps & WrapperProps): ReactElement {
 		const onButtonClick = () => {
-			alert(props.alertText)
-		}
-		// важное замечание: используем спред-синтаксис после всех генерируемых HOC-компонентом пропсов, чтобы не затерлись исходные передаваемые пропсы
-		const newProps = {onButtonClick, buttonText: 'Button Text', ...props}
-		return <WrappedComponent {...newProps} />
-	}
-}
+			alert(alertText);
+		};
+
+		return (
+			<WrappedComponent
+				{...props}
+				onButtonClick={onButtonClick}
+				buttonText="Button Text"
+			/>
+		);
+	};
+};
 
 // Button.tsx
 const Button = ({isEnabled, onButtonClick, buttonText}: PersonalProps & WrapperGeneratedProps) => {
@@ -2386,10 +2445,12 @@ const Button = ({isEnabled, onButtonClick, buttonText}: PersonalProps & WrapperG
 }
 
 // App.tsx
+const WithClickButton = withClick(Button)
+
 const App = () => {
 	//  передаем оборачиваемый компонент в HOC
 	const [isEnabled, setIsEnabled] = useState(false);
-	const WithClickButton = withClick(Button)
+
 	return (
       	// передаем пропсы базового компонента и пропсы используемые только внутри HOC-компонента 
 		<WithClickButton isEnabled={isEnabled} alertText="Some Text"/>
@@ -2398,13 +2459,22 @@ const App = () => {
 ```
 
 [Видео без типизации](https://www.youtube.com/watch?v=KWT8OKzrMZ4)  
-[Дополнения для HOC](https://reactdev.ru/archive/react16/higher-order-components/#static-methods-must-be-copied-over)  
+[Подробнее про HOC](https://www.patterns.dev/react/hoc-pattern/)
 
 [Вернуться к содержанию](#содержание)  
 
 ## 5.4 Compound component
 
-**Compound component** - паттерн для переиспользуемых компонентов, с возможностью переупорядочивания дочерних компонентов.   
+**Compound component** - паттерн, при котором несколько связанных компонентов образуют единый API и могут совместно использовать состояние или данные, сохраняя гибкую композицию через `children`.   
+Например:  
+```tsx
+<UserCard>
+	<UserCard.Header />
+	<UserCard.Main />
+	<UserCard.Footer />
+</UserCard>
+```
+
 **Задача:** В компоненте `UserCard` элементы Header и Footer должны быть опциональными для возможности переиспользовать в разных частях приложения  
 ```tsx
 type TCard = {
@@ -2446,26 +2516,24 @@ const UserCardContext = createContext<UserCardProps | undefined>(undefined);
 // вспомогательный хук
 function useUserCardContext() {
 	const context = useContext(UserCardContext);
-	if(!context) throw new Error('UserCardContext access error')
+	if(context === null) throw new Error('UserCardContext access error')
 	return context
 }
 
 const UserCard = ({children, card}: UserCardProps) => {
 	return (
-		<UserCardContext.Provider value={{children, card}}>
-			<div>
-				{children}
-			</div>
-		</UserCardContext.Provider>
+		<UserCardContext value={card}>
+			<div>{children}</div>
+		</UserCardContext>
 	);
 }
 
 UserCard.Header = function UserCardHeader() {
-	const { card } = useUserCardContext();
-	return <header><h2>{card.title}</h2></header>
+	const card = useUserCardContext();
+	return <header><h2>{card.title}</h2></header>;
 }
 UserCard.Main = function UserCardMain() {
-	const { card } = useUserCardContext();
+	const card = useUserCardContext();
 	return (
 		<div>
 			{card.name}
@@ -2474,7 +2542,7 @@ UserCard.Main = function UserCardMain() {
 	);
 }
 UserCard.Footer = function UserCardFooter() {
-	const { card } = useUserCardContext();
+	const card = useUserCardContext();
 	return <footer><p>Subscribers: {card.subscribers}</p></footer>
 }
 ```
@@ -2499,20 +2567,23 @@ UserCard.Footer = function UserCardFooter() {
 
 ## 5.5 Activity
 
-`<Activity mode>{children}</Activity>` - механизм скрытия части UI с сохранением состояния и пониженным приоритетом обновлений, где  
-* `mode` - режим показа/скрытия: `visible` (по умолчанию) / `hidden`  
+`<Activity mode="visible | hidden">{children}</Activity>` - позволяет скрывать UI с сохранением его DOM и внутреннего состояния  
+* `visible` - компонент отображается и работает как обычно
+* `hidden` - DOM скрывается через `display: none`, Effects очищаются, state сохраняется, а обновления скрытого дерева выполняются с пониженным приоритетом
 
 При скрытии к дочернему компоненту применяется `display: none`, срабатывает cleanup эффектов, но компоненты продолжают ререндериться с низким приоритетом при изменении пропсов  
 Когда компонент становится видимым он восстанавливает свое предыдущее состояние и заново монтирует эффекты  
-Если `Activity` используется внутри `ViewTransition`, то при скрытии срабатывает exit-анимация, при появлении - start-анимация  
+Если `Activity` находится внутри `ViewTransition` и переключение `visible` / `hidden` происходит в Transition, при появлении активируется `enter` анимация, а при скрытии - `exit` анимация.  
 Если дочерний компонент содержит только текст, то при скрытии он не рендерится  
 
 В отличии от условного рендера `{isShowingSidebar && <Modal />}` дочерний компонент:  
 * не инициализирует заново свой `state`  
 * не теряет введенный текст (на примере `textarea`)  
-* заранее рендерит скрытые компоненты, без срабатывания onMount эффектов в режиме скрытия
+* может заранее рендерить скрытые компоненты с низким приоритетом без запуска их Effects  
 
-```jsx
+> При pre-render через `Activity` заранее загружаются только данные из Suspense-совместимых источников (например, Promise через `use`). Fetch внутри `useEffect` заранее не запустится.
+
+```tsx
 <Activity mode={isShow ? "visible" : "hidden"}>
   <>
 	<Modal />
@@ -2523,10 +2594,10 @@ UserCard.Footer = function UserCardFooter() {
 ```
 
 Проблемы с `<video>, <audio>, <iframe>`:  
-Компоненты не имеют собственного cleanup и будут продолжать проигрываться в фоне при скрытии.  
-Для решения проблемы стоит явно добавить cleranup с паузой воспроизведения  
+При `hidden` DOM не удаляется, поэтому побочные эффекты самого DOM-элемента могут продолжаться. Например, `<video>` может продолжать воспроизводиться после скрытия.   
+Для таких элементов нужно явно останавливать side effect в cleanup Effect.  
 
-```jsx
+```tsx
 export default function Video() {
 	const ref = useRef();
 	// используем useLayoutEffect, чтобы избежать задержки при использовании Suspense или ViewTransition
@@ -2546,35 +2617,63 @@ export default function Video() {
 
 ## 5.6 ViewTransition
 
-`<ViewTransition>{children}</ViewTransition>` - компонент React для анимированных переходов (transition) между состояниями интерфейса. По умолчанию анимация crossfade. _(пока еще в Canary)_    
-* `name` - опциональный пропс (string/object) для именования transition. По умолчанию React генерирует для каждого transition уникальное имя  
-* `enter`, `exit`, `update`, `share`, `default` - transition при появлении, скрытии, изменении, общий transition между связанными элементами. Значения: `auto` (по умолчанию), `none` - отсутствие transition данного типа, `<classname>` - кастомный CSS класс (string/object)  
-`default='none'` - отключает все, не заданные явно, transition
-*  `onEnter(instance, types) => {}`, `onExit(instance, types) => {}`, `onShare(instance, types) => {}`, `onUpdate(instance, types) => {}` - event срабатывающий при вызове соответствующего transition, где  
-	* `types` - [массив типов анимаций](https://www.w3.org/TR/css-view-transitions-2/#active-view-transition-pseudo-examples)
-    * `instance` - объект для доступа к псевдоэлементам transition: `old, new, name, group, imagePair`
+`<ViewTransition>{children}</ViewTransition>` - компонент React для анимации изменений интерфейса во время Transition. Использует браузерный View Transition API. По умолчанию применяется crossfade.    
+* `name` -  опциональное имя для shared element transition. Для обычных анимаций задавать его не нужно: React автоматически генерирует уникальное имя  
+* `enter`, `exit`, `update`, `share`, `default` - настройки анимации для соответствующего типа transition
+  * `enter` - ViewTransition появился
+  * `exit` - ViewTransition удалился
+  * `update` - изменился DOM, размер или позиция существующего ViewTransition
+  * `share` - один named ViewTransition исчез, а другой с тем же `name` появился в рамках того же Transition
+  * `default` - значение для типов transition, которым не задано отдельное поведение
+  Каждый из этих props может принимать:
+    * `auto` - стандартная browser-анимация
+    * `none` - отключает анимацию
+    * `<className>` - CSS-класс View Transition
+    * объект `{ [transitionType]: value, default: value }` - позволяет выбрать одно из значений выше в зависимости от Transition Type
+* `onEnter(instance, types)`, `onExit(instance, types)`, `onShare(instance, types)`, `onUpdate(instance, types)` - callbacks для программного управления соответствующей анимацией через Web Animations API, где
+	* `instance` - объект для доступа к псевдоэлементам transition: `old`, `new`, `name`, `group`, `imagePair`
+	* `types` - массив активных Transition Types, добавленных через `addTransitionType`
 
-```jsx
-<ViewTransition
-	name="modal"
-	enter="fade-in"
-	exit="fade-out"
-	update="smooth"
-	share="morph"
->
-	{isOpen ? <Modal /> : null}
-</ViewTransition>
+> Event callback должен возвращать cleanup-функцию для остановки/очистки созданной анимации после завершения или прерывания View Transition.
+
+> Обычный `setState` не активирует `ViewTransition`. Анимация запускается для обновлений внутри Transition (`startTransition`), а также при reveal `Suspense` и обновлениях `useDeferredValue`.
+
+```tsx
+const [isOpen, setIsOpen] = useState(false);
+
+const toggleModal = () => {
+	startTransition(() => {
+		setIsOpen(value => !value);
+	});
+};
+
+return (
+	<>
+		<button onClick={toggleModal}>Toggle</button>
+		{isOpen && (
+			<ViewTransition
+				enter="fade-in"
+				exit="fade-out"
+				default="none"
+			>
+				<Modal />
+			</ViewTransition>
+		)}
+	</>
+);
 ```
 
 Позволяет:
 * анимировать появление и скрытие элементов
 * анимировать изменение layout
-* анимировать переход между fallback и готовым контентом (`Suspense` и `Activity`)
+* анимировать reveal между `Suspense fallback` и готовым контентом
+* вместе с `Activity` анимировать `enter` / `exit`, сохраняя state скрываемого компонента
 * использовать переходы между связанными элементами через name
 * применять разные анимации для разных типов переходов  
 
->Срабатывает только при размещении ДО других DOM элементов
-```jsx
+> Для `enter` / `exit` `<ViewTransition>` должен быть первым компонентом в добавляемом или удаляемом subtree. Если над ним находится DOM-элемент, `enter` / `exit` для этого ViewTransition не активируются.  
+
+```tsx
 //Верно
 <ViewTransition>
 	<div/>
@@ -2587,11 +2686,13 @@ export default function Video() {
 </div>
 ```
 
+> Для анимаций нужно учитывать `prefers-reduced-motion`: React автоматически не отключает View Transition для пользователей, предпочитающих уменьшенную анимацию.
+
 [Подробнее в документации](https://react.dev/reference/react/ViewTransition)  
 
 [Вернуться к содержанию](#содержание)
 
-## 5.7 Container Presenter component
+## 5.7 Container / Presentational components
 
 **Container / Presenter component** - паттерн разделения логики и отображения.  
 `Container` отвечает за получение данных, состояние и обработчики, а `Presenter` только за отображение через props.  
@@ -2950,7 +3051,7 @@ const Index = () => <button onClick={() => create(newPost)}>Create</button>
 
 [Вернуться к содержанию](#содержание)  
 
-# 9.4 cache
+#№ 9.4 cache
 
 `cache(fn)` - кэширование результата (включая ошибки) функции `fn`. Используется **только** в RSC и объявляется снаружи компонента  
 Кэш активен короткое время, пока выполняется серверный запрос. React инвалидирует кэш всех мемоизированных функций при завершении запроса  
@@ -2968,216 +3069,175 @@ const Index = () => <button onClick={() => create(newPost)}>Create</button>
 
 [Вернуться к содержанию](#содержание)  
 
-## 10. Проекция состояния класса (редкий кейс)
+# 10. Интеграция классов с React (редкий кейс)
 
-Примеры обеспечения взаимодействия класса с функциональными компонентами
+Если класс хранит изменяемое состояние вне React, которое используется при render, его можно рассматривать как внешний store и подписать React на изменения через useSyncExternalStore.
 
-## 10.1 Класс с редко изменяемым состоянием
+Если возможно, обычное состояние приложения предпочтительнее хранить непосредственно в React через useState / useReducer.  
+Интеграция с внешним store нужна в основном для существующего non-React кода, сторонних библиотек и browser API.
 
-* Собственное состояние класса - `todos`  
-* Метод `getList` возвращает состояние класса  
-* Методы `add`, `remove` изменяют состояние по условию (например, нажатие кнопки)+
-* Хук `useTodos` - интегрирует логику класса с компонентами React
+## 10.1 Класс с собственным состоянием
+
+Класс должен предоставлять:
+* getSnapshot — получение текущего состояния;
+* subscribe — подписку на изменения с функцией отписки;
+* методы изменения состояния должны уведомлять подписчиков.
 ```tsx
-export interface Todo {
-  id: string;
-  title: string;
+interface Todo {
+	id: string;
+	title: string;
 }
 
-export interface ITodos {
-  getList(): Todo[];
-  add(todo: Todo): void;
-  remove(id: string): void;
-}
+type Listener = () => void;
 
-export class Todos implements ITodos {
-  constructor(private todos: Todo[] = []) {}
+class TodosStore {
+	private todos: Todo[];
+	private listeners = new Set<Listener>();
 
-  getList(): Todo[] {
-    return this.todos;
-  }
-  add(todo: Todo): void {
-    this.todos.push(todo);
-  }
-  remove(id: string): void {
-    this.todos = this.todos.filter(todo => todo.id !== id);
-  }
-} 
-```
+	constructor(initialTodos: Todo[] = []) {
+		this.todos = initialTodos;
+	}
 
-Для взаимодействия с классом нужно создать функцию, где:
-1. Получить инстанс класса в ref
-2. Сохранить собственное состояние класса во внешнем состоянии state
-3. Описать взаимодействие с методами изменяющими собственное состояние класса, обновляя внешний state 
+	getSnapshot = () => {
+		return this.todos;
+	};
 
-```tsx
-export function useTodos(initialTodos?: Todo[]) {
-	// [1] - получаем интстанс
-  const todos = useRef<ITodos>(new Todos(initialTodos));
-	// [2] - сохраняем состояние класса state
-  const buildTodosState = useCallback(() => [...todos.current.getList()], []);
-  const [state, setState] = useState(buildTodosState);
+	subscribe = (listener: Listener) => {
+		this.listeners.add(listener);
 
-  // [3] - методы изменяющие состояние
-  const addTodo = useCallback(
-    (todo: Todo) => {
-      // Вызываем методы класса
-      todos.current.add(todo);
-      // Обновляем state
-      setState(buildTodosState());
-    },
-    [buildTodosState]
-  );
+		return () => {
+			this.listeners.delete(listener);
+		};
+	};
 
-  const removeTodo = useCallback(
-    (id: string) => {
-      todos.current.remove(id);
-      setState(buildTodosState());
-    },
-    [buildTodosState]
-  );
+	add = (todo: Todo) => {
+		this.todos = [...this.todos, todo];
+		this.emitChange();
+	};
 
-  // Возвращаем доступные методы вместе с состоянием
-  return [state, { addTodo, removeTodo }] as const;
-	// as const позволяет указать возвращаемое значение как кортеж
-	// ограничивает и конкретизирует количество элементов
-} 
-``` 
+	remove = (id: string) => {
+		this.todos = this.todos.filter(todo => todo.id !== id);
+		this.emitChange();
+	};
 
-Использование хука в компонентах  
-Если функция передается в HTML элемент, то не нужно использовать useCallback  
-Если функция передается в сам компонент, то:
-```tsx
-const MyComponent = () => {
-	const [todos, { addTodo, removeTodo }] = useTodos();
-	const onAdd = useCallback(() => {
-    // Пользуемся методами мутации
-    addTodo({ id: '123', title: 'Новое todo' });
-  }, [addTodo]);
+	private emitChange() {
+		this.listeners.forEach(listener => listener());
+	}
 }
 ```
+Класс можно подключить к React через custom hook:  
+
+```tsx
+function useTodos(store: TodosStore) {
+	return useSyncExternalStore(
+		store.subscribe,
+		store.getSnapshot,
+	);
+}
+```
+
+Использование:
+```tsx
+function TodoList({ store }: { store: TodosStore }) {
+	const todos = useTodos(store);
+
+	return (
+		<>
+			{todos.map(todo => (
+				<div key={todo.id}>{todo.title}</div>
+			))}
+
+			<button
+				onClick={() => {
+					store.add({
+						id: crypto.randomUUID(),
+						title: 'New todo',
+					});
+				}}
+			>
+				Add
+			</button>
+		</>
+	);
+}
+```
+
+`getSnapshot` должен возвращать то же значение, пока состояние store не изменилось.  
+Поэтому при изменении массива создаётся новый массив, а не мутируется старый.
+
+Для SSR при необходимости также передаётся `getServerSnapshot`.
 
 [Вернуться к содержанию](#содержание)  
 
-## 10.2 Класс с часто изменяемым состоянием
+## 10.2 Класс-сервис без состояния, влияющего на render
+
+Если класс предоставляет методы, но его внутреннее состояние не должно само вызывать render React, подписка не нужна.
+
+Если экземпляр нужен только в одном месте, его можно использовать напрямую.  
+Если один экземпляр сервиса должен быть доступен глубоко в дереве компонентов, его можно передать через Context.
 
 ```tsx
-class Timer {
-  private timer?: number;
-  private intervalTime: number;
-	// передаваемый извне callback 
-  private callback?: () => void;
-	// часто меняющееся состояние
-  time: number;
+interface ApiInterface {
+	getPosts(): Promise<string[]>;
+}
 
-  constructor(intervalTime: number = 1000) {
-    this.timer = undefined;
-		this.intervalTime = intervalTime;
-    this.callback = undefined;
-    this.time = 0;
-
-    this.updateTime();
-  }
-
-  // передаем callback снаружи
-  onChange(callback: () => void) {
-    this.callback = callback;
-  }
-
-  updateTime() {
-    this.time = Date.now();
-		// Вызываем callback на каждое обновление
-    this.callback?.();
-  }
-
-  start() {
-    this.timer = setInterval(() => {
-      this.updateTime();
-    }, this.intervalTime);
-  }
-
-  stop() {
-    clearInterval(this.timer);
-  }
-} 
-```
-
-Для взаимодействия с классом нужно создать функцию, где:
-1. Получить инстанс класса в ref
-2. Передаем useReducer как callback внутрь класса для принудительного обновления внешнего состояния
-
-```tsx
-function useTimer() {
-  // [1] - получаем интстанс
-  const ref = useRef(new Timer());
-	// состояние useReducer используется для ререндер компонента
-	// это число, увеличивающееся при каждом вызове forceUpdate (в примере изменении таймера)
-	const [_, forceUpdate] = useReducer(v => v + 1, 0);
-
-  useEffect(() => {
-    const timer = ref.current;
-    timer.start();
-		// [2] - передаем useReducer в callback
-		timer.onChange(forceUpdate);
-    return () => {
-      timer.stop();
-    };
-  }, []);
-
-	// Состояние класса отдаём наружу
-  return ref.current.time;
+class Api implements ApiInterface {
+	getPosts() {
+		return Promise.resolve(['Первый', 'Второй', 'Третий']);
+	}
 }
 ```
 
-Использование хука в компонентах:
+Если осмысленного значения Context по умолчанию нет, используется null: `const ApiContext = createContext<ApiInterface | null>(null);`
+
+Provider со стабильным экземпляром класса:  
 ```tsx
-function TimerUI() {
-  const time = useTimer();
-  return <div>{time}</div>;
-} 
-```
+function ApiProvider({ children }: PropsWithChildren) {
+	const apiRef = useRef<Api | null>(null);
 
-[Вернуться к содержанию](#содержание)  
+	if (apiRef.current === null) {
+		apiRef.current = new Api();
+	}
 
-## 10.3 Класс без собственных состояний
-
-```tsx
-export interface ApiInterface {
-  getPosts: () => Promise<string[]>;
+	return (
+			<ApiContext value={apiRef.current}>
+				{children}
+			</ApiContext>
+	);
 }
-
-export class Api implements ApiInterface {
-  getPosts() {
-    return Promise.resolve(['Первый', 'Второй', 'Третий']);
-  }
-} 
 ```
-Класс включает в себя только полезные методы, либо его состояние не нужно для функционала компонентов
-Для взаимодействия с ним
-1. Получим инстанс класса в ref
-2. Создать контекст (контекст должен реализовывать функционал класса)
 
+Для чтения Context удобно создать custom hook:
 ```tsx
-// [1] - создаем контекст
-export const ApiContext = createContext<ApiInterface>({
-    getPosts: () => Promise.resolve([]),
-}); 
+function useApi() {
+	const api = useContext(ApiContext);
+
+	if (api === null) {
+		throw new Error('useApi must be used within ApiProvider');
+	}
+
+	return api;
+}
 ```
 
-Использование в компонентах:
+Использование:
 ```tsx
-// [2] - получаем инстанс
-const apiRef = useRef(new Api());
-<ApiContext.Provider value={apiRef.current}></ApiContext.Provider>
+function Posts() {
+	const api = useApi();
 
+	useEffect(() => {
+		api.getPosts().then(posts => {
+			// обработка результата
+		});
+	}, [api]);
 
-const api = useContext(ApiContext);
-useEffect(() => {
-	api.getPosts().then();
-}, [api]);
+	return ...
+}
 ```
 
-[Вернуться к содержанию](#содержание)  
+Context здесь используется для передачи зависимости, а не для синхронизации состояния класса с React.
+
+[Вернуться к содержанию](#содержание)
 
 # Дополнительно 
 
