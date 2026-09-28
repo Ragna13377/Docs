@@ -41,17 +41,17 @@
 	- [5.4 Compound component](#54-compound-component)
 	- [5.5 Activity](#55-activity)
 	- [5.6 ViewTransition](#56-viewtransition)
-	- [5.7 Container / Presentational components](#57-container-presenter-component)
-	- [5.8 Render Props](#58-render-props)
+    - [5.7 Container / Presentational components](#57-container--presentational-components)
+    - [5.8 Render Props](#58-render-props)
 * [6. ReactDOM. Элементы и события React](#6-reactdom-элементы-и-события-react) 
 * [7. Portals](#7-portals) 
 * [8. Переменные окружения в React](#8-переменные-окружения-в-react) 
-* [9. Серверный рендеринг](#9-серверный-рендеринг) 
-	- [9.1 Директивы](#91-директивы)
-		- [9.1.1 use client](#911-use-client)
-		- [9.1.2 use server](#912-use-server)
-	- [9.2 React Server Component](#92-react-server-component)
-	- [9.3 Server Action](#93-server-action)
+* [9. Server React: SSR, RSC и Server Functions](#9-server-react-ssr-rsc-и-server-functions)
+	- [9.1 SSR и Hydration](#91-ssr-и-hydration)
+	- [9.2 React Server Components](#92-react-server-components)
+		- [9.2.1 use client](#921-use-client)
+		- [9.2.2 use server](#922-use-server)
+	- [9.3 Server Functions / Server Actions](#93-server-functions--server-actions)
 	- [9.4 cache](#94-cache)
 * [10. Интеграция классов с React (редкий кейс)](#10-интеграция-классов-с-react-редкий-кейс) 
 	- [10.1 Класс с собственным состоянием](#101-класс-с-собственным-состоянием)
@@ -2694,8 +2694,11 @@ return (
 
 ## 5.7 Container / Presentational components
 
-**Container / Presenter component** - паттерн разделения логики и отображения.  
-`Container` отвечает за получение данных, состояние и обработчики, а `Presenter` только за отображение через props.  
+**Container / Presentational** - паттерн разделения логики и отображения.  
+`Container` отвечает за получение данных и application/business logic и передаёт данные и callbacks через props.  
+`Presentational`-компонент в основном отвечает за отображение UI и может иметь собственное локальное UI-состояние.  
+
+> В современном React отдельный Container-компонент часто заменяется custom hook: логику можно вынести в хук, а UI оставить в компоненте. Сам принцип разделения logic / UI при этом сохраняется.
 
 Паттерн полезен, когда нужно:  
 * отделить UI от data fetching и business logic  
@@ -2712,42 +2715,29 @@ type TUser = {
 
 type UserListProps = {
 	users: TUser[];
-	isLoading: boolean;
 }
 
-// Presenter component
-const UserList = ({ users, isLoading }: UserListProps) => {
-	if (isLoading) return <p>Loading...</p>;
+// Presentational component
+const UserList = ({ users }: UserListProps) => {
 	if (!users.length) return <p>No users</p>;
 
 	return (
-		<ul>
-			{users.map((user) => (
-				<li key={user.id}>
-					<strong>{user.name}</strong> - {user.email}
-				</li>
-			))}
-		</ul>
+			<ul>
+				{users.map((user) => (
+						<li key={user.id}>
+							<strong>{user.name}</strong> - {user.email}
+						</li>
+				))}
+			</ul>
 	);
 };
 
 // Container component
-const UserListContainer = () => {
-	const [users, setUsers] = useState<TUser[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
+const UserListContainer = async () => {
+	const response = await fetch('https://example.com/api/users');
+	const users: TUser[] = await response.json();
 
-	useEffect(() => {
-		async function loadUsers() {
-			const response = await fetch('/api/users');
-			const data = await response.json();
-			setUsers(data);
-			setIsLoading(false);
-		}
-
-		loadUsers();
-	}, []);
-
-	return <UserList users={users} isLoading={isLoading} />;
+	return <UserList users={users} />;
 };
 ```
 
@@ -2755,8 +2745,10 @@ const UserListContainer = () => {
 
 ## 5.8 Render Props
 
-**Render Props** - паттерн, при котором компонент принимает функцию и через нее передает наружу данные или поведение.  
-Это позволяет переиспользовать логику, не привязываясь к конкретной разметке.
+**Render Props** - паттерн, при котором компонент получает функцию через props, вызывает её во время render и передаёт ей свои данные или поведение.  
+Возвращаемый этой функцией React-узел определяет, что будет отображено. Это позволяет переиспользовать логику, не привязываясь к конкретной разметке.
+
+> В современном React для переиспользования stateful-логики чаще используются custom hooks. Render Props всё ещё полезен, когда компоненту нужно предоставить consumer'у контроль именно над разметкой.
 
 **Задача:** Нужно переиспользовать логику отслеживания позиции курсора, но отображать результат в разных компонентах по-разному.  
 
@@ -2794,37 +2786,43 @@ const MouseTracker = ({ render }: MouseTrackerProps) => {
 />
 ```
 
+> Render-функция может передаваться не только через prop `render`, но и через `children` (function as children).
+
 [Вернуться к содержанию](#содержание)
 
 # 6. ReactDOM. Элементы и события React
 
 `SyntheticEvent` - обертка над стандартным событием `Event`, которая обеспечивает единообразное поведение в разных браузерах.  
-`SyntheticEvent.nativeEvent` содержит все методы стандартного события  
-События в React регистрируются в фазу всплытия (bubbling). Для регистрации в фазу (capturing) к событию нужно добавить слово Capture: `onClickCapture`  
-Типизация события в React: `ChangeEvent<TSomeType>`  
+`SyntheticEvent.nativeEvent` - исходный browser `Event`. React event не всегда 1:1 соответствует native event, конкретный mapping не является частью публичного API  
+Обычные React event handlers (`onClick`, `onChange` и т.д.) вызываются на target и при распространении события вверх по React-дереву.    
+Для обработки события в capture phase используется суффикс `Capture`: `onClickCapture`.  
+
+> Большинство событий в React распространяются вверх по дереву, но есть исключения, например `onScroll` не всплывает.
 
 ----
 
-Стандартные пропсы поддерживаемые всеми компонентами:  
+Общие props, поддерживаемые встроенными DOM-компонентами:
 * `children` - React узел, который может быть элементом, строкой, числом, порталом или пустым узлом (null, undefined), массивом React узлов.
 * `dangerouslySetInnerHTML` - замена `innerHTML` для вставки сырого HTML, уязвимого к XSS  
 `dangerouslySetInnerHTML: {__html: `<span>Some HTML</span>`}`
 * `ref` - объект из `useRef`, `createRef`, callback-ref для связи ссылки с DOM-элементом
-* `suppressContentEditableWarning` - скрытие предупреждений об использовании свойства `contentEditable`.  
-Применение: при использовании React DND и компонентов с атрибутом contentEditable, т.к. `<input>, <textarea>` при добавлении draggable функционала теряют возможность ввода данных
-* `suppressHydrationWarning` - скрытие предупреждение об отличии контента при серверном и клиентском рендере.  
-Применение: при использовании Next в клиентских компонентах при ошибках гидратации или в сторонних библиотеках изменяющих данные  
+* `suppressContentEditableWarning` -скрывает warning React для элемента, который одновременно имеет `contentEditable={true}` и управляемые React `children`.  
+Используется, если содержимое `contentEditable` управляется вручную, например внутри text editor
+* `suppressHydrationWarning` - подавляет warning о различиях между server/client HTML на этом элементе.  
+Используется как escape hatch для заведомо неизбежных различий (например, timestamp), работает только на один уровень в глубину. Не следует использовать для скрытия обычных hydration bugs     
 * `style` - объект `CSSProperties` для применения стилей к элементу  
 
 [Список всех пропсов в официальной документации](https://react.dev/reference/react-dom/components/common#reference)  
 
-Компоненты бывают 2х видов: управляемые (с обратным связыванием - через useState) **ИЛИ** неуправляемые (без обратного связывания - через useRef)  
+Form controls (`input`, `select`, `textarea`) могут быть controlled или uncontrolled.  
+* Controlled - текущее значение задаётся React через `value` / `checked` и синхронно обновляется через `onChange`  
+* Uncontrolled - текущее значение хранится самим DOM; через `defaultValue` / `defaultChecked` можно задать только начальное значение. При необходимости значение можно прочитать через ref или FormData  
 `<input>` считается управляемым, если задан проп `value`.  
 `<input type="radio">`, `<input type="checkbox">` - считаются управляемыми, если задан пропс `checked`  
-Управляемым инпутам должны быть заданы обработчики изменений.  
+  Управляемому input нужен `onChange`, синхронно обновляющий backing state, либо `readOnly`, если значение намеренно нельзя изменять.    
 >`<input type="file">` - всегда неуправляемый компонент.  
   
-В элементе `<option>` отсутствует пропс `selected`. Значение передается в `defaultValue` родительского элемента `<select>` (неуправляемый список) или в `velue` (управляемый список)
+В элементе `<option>` отсутствует пропс `selected`. Значение передается в `defaultValue` родительского элемента `<select>` (неуправляемый список) или в `value` (управляемый список)
 
 В элемент `<textarea>` нельзя передать `chidren`. Для установки начального значения используется `defaultValue` (неуправляемый), или `value` (управляемый)
 
@@ -2891,7 +2889,9 @@ const MyComponent = () => {
 }
 ```
 
-При работе с данными от сервера, пришедшее значение может быть null или undefined, что принудительно изменит режим компонента на неуправляемый.  
+ontrolled input не должен переключаться между controlled и uncontrolled.  
+Для текстового input `value` должен оставаться строкой на всём времени жизни компонента, поэтому данные `null / undefined` обычно нормализуют: `value={data ?? ''}`.    
+Для `checked` значение должно оставаться boolean.  
 При получении значения от пользователя режим изменится на управляемый  
 Чтобы избежать ошибки с изменением режима, нужно контролировать исходное значение: `{state.requestData ?? ""}`  
 
@@ -2901,10 +2901,10 @@ const MyComponent = () => {
 
 [Порталы на практике](https://www.youtube.com/watch?v=V4sHZzX4zh0)  
 
-`createPortal(children, domNode, key?)` - позволяет отрендерить дочерние элементы `children` вне иерархии родительского компонента (в другую часть DOM)  
+`createPortal(children, domNode, key?)` - позволяет отрендерить `children` в другом месте DOM, сохраняя их положение в исходном React-дереве    
 Портал меняет только физическое расположение узла DOM. JSX, который помещается в портал, действует как обычный дочерний узел (имеет доступ к состояниям родителя и т.д.)  
 * `children` - React узел
-* `domNode` - DOM-узел, в котором будет рендериться children
+* `domNode` - существующий DOM-узел, в который рендерится `children`. Если во время update передать другой `domNode`, содержимое portal будет пересоздано
 * `key` - опциональный ключ (см. [DOM Diffing](#react-под-капотом))
 
 События от порталов распространяются в соответствии с деревом React, а не DOM  
@@ -2918,152 +2918,405 @@ const MyComponent = () => {
 [Подробно про создание переменных окружения](https://www.youtube.com/watch?v=wkfWaI_lI48) 
 [Текстом про переменные окружения](https://danshin.ms/React-Environment-Variables/) 
 
-В Create React App переменные окружения для клиента должны начинаться с `REACT_APP`: `REACT_APP_API_KEY`  
-Использование в файлах: `process.env.REACT_APP_API_KEY`
+React сам по себе не предоставляет API для переменных окружения — способ их загрузки и использования определяется framework / build tool.
 
-Основные методы: 
-1. в настройках системы Windows (Изменение системных переменных сред) или другой ОС
-2. в кроссплатформенной среде cross-env (необходима установка `npm install -D cross-env `) `cross-env REACT_APP_CROSS_ENV=value`
-3. в .env файлах (необходима установка `npm install -D dotenv-webpack`): `REACT_APP_API_KEY=8sdf3218652sdfq84531203asasd`  
+>Переменные, доступные клиентскому JavaScript, попадают в browser bundle и не должны содержать секретные данные.
 
-Подключение в webpack: 
+## Vite
+
+Vite автоматически загружает .env-файлы и предоставляет переменные через import.meta.env.
+
+Переменные, доступные клиентскому коду, по умолчанию должны иметь префикс VITE_:
+
 ```tsx
-const Dotenv = require('dotenv-webpack');
+VITE_API_URL=https://example.com
+DB_PASSWORD=secret
 
-module.exports = {
-    plugins: [
-        new Dotenv()
-    ]
-} 
+const apiUrl = import.meta.env.VITE_API_URL; // доступно
+const password = import.meta.env.DB_PASSWORD; // undefined
 ```
 
+Пользовательские env-переменные в import.meta.env приходят как строки, поэтому значения других типов необходимо преобразовывать самостоятельно.
+
+Встроенные значения:
+
+```tsx
+import.meta.env.MODE      // текущий mode
+import.meta.env.DEV       // development
+import.meta.env.PROD      // production
+import.meta.env.SSR       // выполняется в SSR
+import.meta.env.BASE_URL  // base URL приложения
+```
+
+Для разных окружений можно использовать:
+
+```tsx
+.env
+.env.local
+.env.development
+.env.production
+.env.[mode]
+.env.[mode].local
+```
+
+Например: `vite build --mode staging` загрузит переменные для staging mode.
+
+## Next.js
+
+Next.js автоматически загружает .env* файлы и предоставляет server-side переменные через process.env:  
+
+```tsx
+DATABASE_URL=postgres://...
+const databaseUrl = process.env.DATABASE_URL;
+```
+
+По умолчанию такие переменные доступны только серверному коду.
+
+Для переменной, которая должна быть доступна клиентскому JavaScript, используется префикс `NEXT_PUBLIC_`:
+
+```tsx
+NEXT_PUBLIC_API_URL=/api
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+```
+
+`NEXT_PUBLIC_*` значения встраиваются в client bundle во время next build, поэтому:
+* они не должны содержать секретные данные;
+* после сборки их значения зафиксированы и не изменяются при изменении environment на уже собранном приложении.
+
+Server-only переменные без `NEXT_PUBLIC_` можно читать на сервере во время выполнения приложения.
+
+>.env-файлы с секретами не должны попадать в Git. Обычно локальные значения хранятся в .env.local.
+
 [Вернуться к содержанию](#содержание)  
 
-# 9. Серверный рендеринг
+# 9. Server React: SSR, RSC и Server Functions
 
-## 9.1 Директивы  
-
-Директива **должна находиться** в самом верху файла - **выше импортов!** (исключение: комментарии)  
-
-Пропсы, передаваемые от серверного компонента клиентскому должны быть сериализуемы.   
-_Несериализуемы: функции, классы, объекты с прототипом null, символы не зарегистрированные глобально_
-
-### 9.1.1 use client
-
-Директива `use client` служит для обозначения клиентских компонентов (по умолчанию компоненты серверные). Она служит границей между клиентской и серверной частью приложения   
-
->Клиентский компонент может импортировать ТОЛЬКО клиентские компоненты (импортируемым компонентам не обязательно наличие директивы). _Импорт серверного компонента приведет к ошибке._  
-Для использования серверных компонентов в качестве дочерних, нужно передать их через пропс `children` 
-
-Клиентские компоненты используются при наличии: 
-* хуков 
-* обработчиков событий
-* работы с BOM (cookies, storage, navigation и т.д.)
-* сторонних библиотек использующих хуки и BOM
-
-[Примеры в официальной документации](https://react.dev/reference/rsc/use-client)
-
-[Вернуться к содержанию](#содержание)  
-
-### 9.1.2 use server
-
-Директива `use server` служит для обозначения серверных функций и серверных действий. Все компоненты по умолчанию являются серверными.  
-
-Серверные компоненты используются при наличии асинхронных запросов или статических файлов, не использующих клиентский функционал  
-Важно следить за передачей чувствительных данных в качестве пропсов на клиент (например, секретные ключи)  
-_Существуют экспериментальная экранировка передаваемых пропсов: [experimental_taintObjectReference](https://react.dev/reference/react/experimental_taintObjectReference) и [experimental_taintUniqueValue](https://react.dev/reference/react/experimental_taintUniqueValue)_  
-`experimental_taintObjectReference(message, object)`, помогает предотвратить передачу объекта `object` клиенту, отображая сообщение `message` (сравнение по ссылке)  
-Не гарантирует защиту от передачи уязвимых данных, т.к. объект можно склонировать и т.д.  
-`taintUniqueValue(errMessage, lifetime, value)` - помогает предотвратить передачу уникального значения `value` (string, bigInt, TypedArray) клиенту, отображая сообщение `message`, где  
-`lifetime` -  объект, существование которого ограничивает передачу чувствительных данных на клиент  
-Не гарантирует защиту от передачи уязвимых данных, т.к. строки можно преобразовать в другой регистр и т.д. 
-
-[Примеры в официальной документации](https://react.dev/reference/rsc/use-server#calling-a-server-action-outside-of-form)
-
-[Вернуться к содержанию](#содержание)  
-
-## 9.2 React Server Component
-
-Серверные компоненты (RSC) позволяют рендерить контент на сервере, не нагружая клиент.  
-При использовании серверных компонентов _без сервера_, генерация HTML и обработка данных происходит в процессе сборки.  
-**Преимущества:**  
-* Ускорение загрузки и освобождение ресурсов браузера (уменьшение FCP и TTI)  за счет исключение клиентского рендера и обработки данных, т.к. серверные компоненты отправляются на клиент уже отрендеренными 
-* Улучшение SEO, т.к. происходит отправка полностью отрендеренных страниц 
-* Размер клиентского бандла уменьшается, т.к. исключаются тяжелые библиотеки и зависимости, используемые для обработке данных на сервере
-* Безопасность при использовании секретных данных (API key), т.к. они не передаются на клиент  
-* Упрощение структуры проекта и уменьшение количества запросов, т.к. серверные компоненты могут напрямую обращаться к БД или другим источникам данных без создания отдельного API
-
-Серверные компоненты используются в связке с клиентскими компонентами, которые добавляют интерактивность (обработчики событий, BOM, хуки)  
-Клиентские компоненты не всегда рендерятся только на клиенте. Они могут быть предварительно отрендерены на сервере и ререндериться на клиенте, из-за чего может возникнуть warning, что данные рендера отличаются  
-_Асинхронными компонентами могут быть только RSC_   
->RSC рендерятся **только один раз**, поэтому их нельзя импортировать в клиентских компонентах (клиентский компонент может перерендериться при изменении state).
+SSR и React Server Components (RSC) — разные механизмы, которые могут использоваться вместе.
+* SSR (Server-Side Rendering) — React генерирует начальный HTML на сервере, после чего клиентский React выполняет hydration и делает страницу интерактивной.
+* RSC (React Server Components) — часть компонентов выполняется только в серверном окружении и их код не отправляется в browser. Результат их render передаётся клиенту в сериализованном формате React Server Components.
+* Client Components в RSC-приложении при этом также могут предварительно рендериться на сервере в HTML и затем гидратироваться на клиенте.
 
 [Отличия между серверными и клиентскими компонентами](https://www.youtube.com/watch?v=ePAPd9qzGyM)  
 [То же самое, но покороче](https://www.youtube.com/watch?v=Qdkg_mrniLk)  
 [Отдельно про передачу серверных компонентов в клиентские](https://www.youtube.com/watch?v=9YuHTGAAyu0)  
 [Еще один вариант объяснения, если не хватило предыдущих](https://www.youtube.com/watch?v=rGPpQdbDbwo)
 
-[Вернуться к содержанию](#содержание)  
+## 9.1 SSR и Hydration
 
-## 9.3 Server Action
+Для SSR React предоставляет API из react-dom/server.
 
-Серверные действия - механизм использования серверного кода в клиентском компоненте без создания api и запроса.  
-В клиентский компонент передается не сама функция, а ссылка на нее.  
->Серверные действия должны быть отмечены директивой `use server`
-
-**Преимущества:**
-* Упрощение взаимодействия сервер-клиент. Исключает необходимость созать отдельные API роуты.
-* Безопасность - функция НЕ отправляется на клиент, передается ссылка на функцию.
-* Интеграция с новыми хуками useActionState
-
-Пример Next без серверных действия
+Основные streaming API:
 ```tsx
-// создание запроса к серверному API на клиенте
-const handleSubmit = () => {
-	const response = fetch('/api/addPost', {
-		method: 'POST',
-		body: JSON.stringify(newPost)
-	})
-}
+renderToPipeableStream() // Node.js
+renderToReadableStream() // Web Streams / Edge
+```
 
-// создание API роута на сервере 
-const handler = (req, res) => {
-	if(req.method === 'POST') {
-		await db.posts.create(req.body);
-		res.status(200).json({success: true})
-	} else res.status(405).end()
+renderToString() также существует, но имеет меньше возможностей и не поддерживает современный streaming так же полно.
+
+На клиенте серверный HTML гидратируется через:
+```tsx
+import { hydrateRoot } from 'react-dom/client';
+
+hydrateRoot(
+	document.getElementById('root')!,
+	<App />,
+);
+```
+
+Hydration связывает существующий серверный HTML с React-логикой и event handlers, не создавая DOM заново.
+
+>Начальный render на клиенте должен выдавать тот же результат, что и render на сервере. Hydration mismatch следует считать ошибкой и исправлять, а не скрывать через suppressHydrationWarning.
+
+Frameworks, например Next.js, обычно самостоятельно управляют server rendering, streaming и hydration.
+
+[Вернуться к содержанию](#содержание)
+
+## 9.2 React Server Components
+
+React Server Components выполняются в отдельном серверном окружении и не отправляют свой component code в client bundle.
+
+Server Components могут выполняться:
+* во время build для статического контента;
+* на сервере во время запроса.
+
+Server Components могут:
+* использовать async / await прямо в компоненте;
+* получать данные из БД, файловой системы и других server-only источников;
+* использовать server-only зависимости;
+* работать с секретами, если они не передаются клиентскому коду;
+* импортировать и рендерить Client Components.
+
+Server Components не могут использовать интерактивные client API:
+* локальный state через useState / useReducer;
+* Effects;
+* event handlers (onClick, onChange и т.д.);
+* browser API (window, document, localStorage и т.д.).
+
+```tsx
+async function UserPage({ id }: { id: string }) {
+	const user = await db.user.findUnique({
+		where: { id },
+	});
+
+	return <UserProfile user={user} />;
 }
 ```
-Пример с серверными действиями:
+
+RSC не следует путать с SSR:
+
+```text
+SSR:
+React component -> HTML -> hydration в browser
+
+RSC:
+Server Component выполняется только на сервере
+-> его component code не нужен browser
+-> результат используется для построения React tree
+```
+
+Server Components не обязательно выполняются только один раз.  
+Framework может повторно выполнить их при новом запросе, навигации, обновлении данных и других server renders.
+
+[Вернуться к содержанию](#содержание)  
+
+### 9.2.1 use client
+
+Директива: `use client` создаёт границу между server и client module graph.  
+
+Она должна находиться в начале файла до imports и другого кода (комментарии допустимы).
 ```tsx
-// серверное действие
-'use server'
-
-export const create = async (data) => {
-	await db.posts.create(data);
-}
-
-// использование в клиентском компоненте
 'use client';
-import {create} from './actions'
-const Index = () => <button onClick={() => create(newPost)}>Create</button>
+
+import { useState } from 'react';
+
+export function Counter() {
+	const [count, setCount] = useState(0);
+
+	return (
+		<button onClick={() => setCount(count + 1)}>
+			{count}
+		</button>
+	);
+}
 ```
+
+Модуль с `use client` и его транзитивные зависимости становятся client code.
+
+Поэтому `use client` не нужно добавлять в каждый Client Component — достаточно определить server/client boundary.
+
+Компонент без собственной директивы `use client` также станет Client Component, если он импортирован внутри client module subtree.
+
+`use client` нужен, когда используются:
+* state и большинство client Hooks;
+* Effects;
+* event handlers;
+* browser API;
+* client-only библиотеки.
+
+Server Component нельзя напрямую импортировать в client module как server-executed компонент.
+
+Но Server Component может быть заранее создан серверным родителем и передан Client Component через children или другой prop:
+```tsx
+// Server Component
+function Page() {
+	return (
+		<ClientLayout>
+			<ServerContent />
+		</ClientLayout>
+	);
+}
+```
+
+Здесь ClientLayout не импортирует и не выполняет ServerContent — он получает уже созданный React-узел.
+
+Значения, пересекающие Server → Client boundary через props, должны быть сериализуемыми.
+
+Поддерживаются, например:
+* primitives;
+* plain objects / arrays;
+* Date;
+* Map / Set;
+* Promise;
+* React elements;
+* Server Functions.
+
+Нельзя передавать обычные функции, экземпляры пользовательских классов, объекты с null prototype и незарегистрированные через Symbol.for() symbols.  
+
+>Client Component не означает «рендерится только в browser». Framework может предварительно отрендерить Client Component на сервере в HTML, а затем гидратировать его на клиенте.
 
 [Вернуться к содержанию](#содержание)  
 
-#№ 9.4 cache
+### 9.2.2 use server
 
-`cache(fn)` - кэширование результата (включая ошибки) функции `fn`. Используется **только** в RSC и объявляется снаружи компонента  
-Кэш активен короткое время, пока выполняется серверный запрос. React инвалидирует кэш всех мемоизированных функций при завершении запроса  
-Каждый вызов `cache`, создает новую функцию, которая имеет собственный кэш.  
+`use server` НЕ обозначает Server Component.
 
-Сравнение методов кэширования:
-||useMemo|cache|memo|
-|----|----|----|----|
-|Тип компонента|Клиентский|Серверный|Клиентский|
-|Возможность передачи между компонентами|Нет|Да|Да|
-|Время жизни кэша|Между рендерами, пока не изменятся deps|Ограничен одним серверным запросом|Между рендерами, пока не изменятся deps|
-|Кэшируемые данные|Вычисления|Данные и вычисления|Компонент|
+Для Server Components отдельной директивы нет.
+
+`use server` помечает async Server Function, которую клиентский код может вызвать на сервере.
+```tsx
+async function createPost(formData: FormData) {
+	'use server';
+
+	// server code
+}
+```
+или в начале файла:
+```tsx
+'use server';
+
+export async function createPost(formData: FormData) {
+	// server code
+}
+
+export async function deletePost(id: string) {
+	// server code
+}
+```
+
+При module-level 'use server' экспортируемые функции должны быть async Server Functions.
+
+При вызове Server Function с клиента framework отправляет сетевой запрос на сервер, выполняет функцию и при необходимости возвращает сериализуемый результат.
+
+Аргументы и возвращаемые значения Server Function должны быть сериализуемыми.
+
+>Аргументы Server Function всегда нужно считать недоверенными пользовательскими данными. Authentication, authorization и validation должны выполняться внутри серверной функции.
+
+[Вернуться к содержанию](#содержание)  
+
+## 9.3 Server Functions / Server Actions
+
+**Server Function** — async функция, выполняемая на сервере и доступная для вызова из клиентского кода через `use server`.
+
+React раньше называл все такие функции Server Actions. Сейчас терминология разделена:
+* **Server Function** — общее название;
+* **Server Action** — Server Function, используемая как Action, например через <form action> или внутри Transition.
+
+Framework создаёт ссылку на Server Function. На клиент не отправляется её серверная реализация.
+```tsx
+// actions.ts
+'use server';
+
+export async function createPost(formData: FormData) {
+	const title = formData.get('title');
+
+	if (typeof title !== 'string') {
+		throw new Error('Invalid title');
+	}
+
+	await db.post.create({
+		data: { title },
+	});
+}
+```
+
+Server Function можно использовать напрямую как form Action:
+```tsx
+import { createPost } from './actions';
+
+export function CreatePostForm() {
+	return (
+		<form action={createPost}>
+			<input name="title" />
+			<button type="submit">Create</button>
+		</form>
+	);
+}
+```
+Server Functions также можно вызывать из Client Components:
+```tsx
+'use client';
+
+import { startTransition } from 'react';
+import { deletePost } from './actions';
+
+function DeleteButton({ id }: { id: string }) {
+	return (
+		<button
+			onClick={() => {
+				startTransition(() => {
+					deletePost(id);
+				});
+			}}
+		>
+			Delete
+		</button>
+	);
+}
+```
+Server Functions должны вызываться как Actions / внутри Transition.
+При передаче функции в <form action> или formAction React запускает её как Action автоматически.
+
+Server Functions в первую очередь предназначены для mutations:
+* создание / изменение / удаление данных;
+* отправка формы;
+* выполнение server-side side effects.
+
+Для обычного получения данных внутри Server Component предпочтительнее выполнить запрос непосредственно при render:
+```tsx
+async function Posts() {
+	const posts = await db.post.findMany();
+
+	return <PostList posts={posts} />;
+}
+```
+
+Server Functions не устраняют сетевой запрос — они позволяют не создавать вручную отдельный API endpoint и клиентский fetch для каждой mutation.
+
+Интегрируются с:
+* `useActionState`
+* `useOptimistic`
+* `<form action>`
+* `formAction`
+* `startTransition`
+
+[Вернуться к содержанию](#содержание)  
+
+## 9.4 cache
+
+`cache(fn)` — memoization API для React Server Components.
+```tsx
+import { cache } from 'react';
+
+const getUser = cache(async (id: string) => {
+	return db.user.findUnique({
+		where: { id },
+	});
+});
+```
+
+Повторные вызовы memoized-функции с теми же аргументами в рамках одного server request используют закэшированный результат:  
+```tsx
+const user1 = await getUser('123');
+const user2 = await getUser('123');
+```
+
+Второй вызов может использовать результат первого.
+
+Особенности:
+* cache используется только в Server Components;
+* cache(fn) обычно объявляется на module scope вне компонентов;
+* каждый вызов cache(fn) создаёт новую memoized-функцию со своим отдельным cache;
+* результаты кэшируются по аргументам вызова;
+* ошибки функции также кэшируются;
+* React очищает cache memoized-функций между server requests.
+
+Поэтому:
+```tsx
+const getUser1 = cache(getUser);
+const getUser2 = cache(getUser);
+```
+
+создаёт две независимые memoized-функции — их cache не общий.
+
+`cache` полезен для дедупликации повторных вычислений и data fetching между несколькими Server Components в рамках одного server request.
+
+>`cache` не является постоянным application/data cache между запросами. Framework может предоставлять собственные дополнительные механизмы долгоживущего кэширования.
+
+`cache`, `useMemo` и memo решают разные задачи:
+* `cache` — memoization server-side функций между несколькими Server Components в рамках server request;
+* `useMemo` — memoization вычисления внутри конкретного component instance между его renders;
+* `memo` — возможность пропустить render компонента, если его props не изменились.
 
 [Подробное объяснение](https://www.youtube.com/watch?v=A8JGtz2yF9g)  
 
